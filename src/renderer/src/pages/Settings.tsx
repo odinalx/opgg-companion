@@ -17,10 +17,10 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Réglages" />
-      <div className="flex max-w-2xl flex-col gap-8">
+      <PageHeader title="Réglages" subtitle="Compte, données prises en compte et modèle de draft." />
+      <div className="flex max-w-2xl flex-col gap-10">
         <section>
-          <h2 className="font-display text-xl font-semibold">Compte</h2>
+          <h2 className="font-display text-2xl font-bold">Compte</h2>
           {status.connected && status.account ? (
             <p className="mt-1 text-sm text-mute">
               Compte détecté dans le client : {status.account.gameName}#{status.account.tagLine} ({status.account.region}). Il est
@@ -45,24 +45,42 @@ export function SettingsPage() {
               onChange={(e) => setRiotId(e.target.value)}
               placeholder="Pseudo#TAG"
               aria-label="Riot ID"
-              className="flex-1 rounded-md border border-line bg-panel px-3 py-1.5 outline-none focus:border-gold"
+              className="field flex-1 px-3 py-2"
             />
             <select
               value={region}
               onChange={(e) => setRegion(e.target.value as Region)}
               aria-label="Région"
-              className="rounded-md border border-line bg-panel px-2 py-1.5"
+              className="field px-2.5"
             >
               {REGIONS.map((r) => (
                 <option key={r}>{r}</option>
               ))}
             </select>
-            <Button>Enregistrer</Button>
+            <Button type="submit">Enregistrer</Button>
           </form>
+          <div className="mt-3 flex gap-2">
+            {!status.connected && (
+              <Button variant="primary" onClick={() => void window.api.launchRiotClient().catch(() => undefined)}>
+                Se connecter avec Riot
+              </Button>
+            )}
+            {manual && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setRiotId('')
+                  void window.api.signOut().then(() => updateSettings({}))
+                }}
+              >
+                Oublier ce Riot ID
+              </Button>
+            )}
+          </div>
         </section>
 
         <section>
-          <h2 className="font-display text-xl font-semibold">Games prises en compte</h2>
+          <h2 className="font-display text-2xl font-bold">Games prises en compte</h2>
           <p className="mt-1 text-sm text-mute">Pour les stats et le winrate perso du draft helper.</p>
           <div className="mt-3 flex gap-4 text-sm">
             {(['ranked', 'all'] as const).map((q) => (
@@ -72,7 +90,7 @@ export function SettingsPage() {
                   name="queue"
                   checked={s.queueFilter === q}
                   onChange={() => void updateSettings({ queueFilter: q })}
-                  className="accent-[var(--color-gold)]"
+                  className="accent-[var(--color-accent)]"
                 />
                 {q === 'ranked' ? 'Classées (solo et flex)' : 'Toutes les files'}
               </label>
@@ -83,7 +101,7 @@ export function SettingsPage() {
         <ModelSection useModel={s.useModel} onToggle={(v) => void updateSettings({ useModel: v })} />
 
         <section className="text-sm text-mute">
-          <h2 className="font-display text-xl font-semibold text-ink">Sources</h2>
+          <h2 className="font-display text-2xl font-bold text-ink">Sources</h2>
           <p className="mt-1">
             Statistiques et historiques : OP.GG MCP. Compte, mastery et sélection en direct : client League of Legends local
             (lecture seule, aucune action automatique). Icônes : Riot Data Dragon.
@@ -120,7 +138,7 @@ function ModelSection({ useModel, onToggle }: { useModel: boolean; onToggle: (v:
 
   return (
     <section>
-      <h2 className="font-display text-xl font-semibold">Poids appris sur ton historique</h2>
+      <h2 className="font-display text-2xl font-bold">Poids appris sur ton historique</h2>
       <p className="mt-1 text-sm text-mute">
         Une régression logistique apprend quels critères comptent le plus dans tes victoires, à partir d'au moins 50 games
         classées. Elle remplace alors les curseurs du draft helper.
@@ -145,13 +163,13 @@ function ModelSection({ useModel, onToggle }: { useModel: boolean; onToggle: (v:
             checked={useModel}
             disabled={!model}
             onChange={(e) => onToggle(e.target.checked)}
-            className="h-4 w-4 accent-[var(--color-gold)]"
+            className="h-4 w-4 accent-[var(--color-accent)]"
           />
           Utiliser ces poids
         </label>
       </div>
       {model && (
-        <div className="mt-4 rounded-lg border border-line bg-panel p-4 text-sm">
+        <div className="card mt-4 p-5 text-sm">
           <p className="text-mute">
             Entraîné sur {model.samples} games le {new Date(model.trainedAt).toLocaleDateString('fr-FR')}. Précision en
             validation croisée : <span className="text-ink">{pct(model.accuracy)}</span> (référence sans modèle :{' '}
@@ -167,7 +185,7 @@ function ModelSection({ useModel, onToggle }: { useModel: boolean; onToggle: (v:
               <li key={k} className="flex items-center gap-3">
                 <span className="w-28">{NAMES[k]}</span>
                 <div className="h-2 flex-1 rounded bg-panel-2">
-                  <div className="h-2 rounded bg-gold" style={{ width: `${model.weights[k]}%` }} />
+                  <div className="h-2 rounded bg-accent" style={{ width: `${model.weights[k]}%` }} />
                 </div>
                 <span className="num w-10 text-right text-base">{model.weights[k]}</span>
               </li>

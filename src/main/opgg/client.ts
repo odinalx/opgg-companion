@@ -104,7 +104,7 @@ export class OpggClient {
         desired_output_fields: [
           'data.summoner.{game_name,tagline,level,profile_image_url}',
           'data.summoner.league_stats[].{game_type,win,lose,is_hot_streak}',
-          'data.summoner.league_stats[].tier_info.{tier,division,lp}',
+          'data.summoner.league_stats[].tier_info.{tier,division,lp,tier_image_url}',
           'data.summoner.most_champions.champion_stats[].{champion_name,play,win,kill,death,assist}'
         ]
       })
@@ -122,7 +122,8 @@ export class OpggClient {
           lp: l.tier_info?.lp ?? null,
           wins: l.win ?? 0,
           losses: l.lose ?? 0,
-          hotStreak: !!l.is_hot_streak
+          hotStreak: !!l.is_hot_streak,
+          emblemUrl: l.tier_info?.tier_image_url ?? null
         })),
         champions: (s.most_champions?.champion_stats ?? []).map((c: any) => ({
           champion: c.champion_name,

@@ -45,6 +45,8 @@ export interface Api {
   getModel(): Promise<ModelInfo | null>
   trainModel(): Promise<ModelInfo>
   openExternal(url: string): Promise<void>
+  launchRiotClient(): Promise<void>
+  signOut(): Promise<void>
   onClientStatus(cb: (s: ClientStatus) => void): () => void
   onLiveDraft(cb: (d: DraftState | null) => void): () => void
   onTrainProgress(cb: (p: { done: number; total: number }) => void): () => void

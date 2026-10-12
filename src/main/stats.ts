@@ -2,6 +2,7 @@
 
 import type { MatchSummary, Position, StatsAggregate } from '@shared/types'
 import { POSITIONS } from '@shared/types'
+import { skillProfile } from './skills'
 
 export const RANKED_QUEUES = new Set(['SOLORANKED', 'FLEXRANKED'])
 
@@ -86,7 +87,8 @@ export function aggregate(matches: MatchSummary[]): StatsAggregate {
     visionPerGame: games ? sum((m) => m.wardsPlaced) / games : 0,
     byChampion,
     byPosition,
-    trend
+    trend,
+    skills: skillProfile(matches)
   }
 }
 

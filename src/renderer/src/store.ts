@@ -35,9 +35,11 @@ export const useApp = create<AppState>((set, get) => ({
       set({ status: s })
       void get().refreshAccount()
     })
-    // Le client entre en champ select : on bascule sur le draft helper.
+    // Le client entre en champ select : on bascule une fois sur le draft helper.
+    let inChampSelect = !!(await window.api.getLiveDraft())
     window.api.onLiveDraft((d) => {
-      if (d) set({ page: 'draft' })
+      if (d && !inChampSelect) set({ page: 'draft' })
+      inChampSelect = !!d
     })
   },
   async refreshAccount() {

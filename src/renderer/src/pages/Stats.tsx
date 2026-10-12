@@ -3,7 +3,8 @@ import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Too
 import type { StatsAggregate } from '@shared/types'
 import { useApp } from '../store'
 import { ChampIcon } from '../components/Icons'
-import { Empty, PageHeader, Spinner } from '../components/ui'
+import { SkillRadar } from '../components/Radar'
+import { Empty, PageHeader, Spinner, WrBar } from '../components/ui'
 import { pct, positionLabel, wrColor } from '../lib/format'
 
 export function StatsPage() {
@@ -19,12 +20,12 @@ export function StatsPage() {
 
   return (
     <>
-      <PageHeader title="Stats">
+      <PageHeader title="Stats" subtitle="Calculées sur tout l'historique enregistré.">
         <select
           aria-label="Games prises en compte"
           value={queueFilter}
           onChange={(e) => void updateSettings({ queueFilter: e.target.value as 'ranked' | 'all' })}
-          className="rounded-md border border-line bg-panel px-2.5 py-1.5 text-sm"
+          className="field px-3 py-2 text-sm"
         >
           <option value="ranked">Classées uniquement</option>
           <option value="all">Toutes les files</option>
@@ -47,8 +48,16 @@ export function StatsPage() {
             <Tile label="Wards par game" value={stats.visionPerGame.toFixed(1)} />
           </div>
 
-          <section className="rounded-lg border border-line bg-panel p-5">
-            <h2 className="font-display text-xl font-semibold">Winrate cumulé</h2>
+          {stats.skills.length > 0 && (
+            <section className="card p-6">
+              <h2 className="font-display text-2xl font-bold">Profil de jeu</h2>
+              <p className="mb-4 text-sm text-mute">Tes points forts par domaine, comparés aux repères de chaque rôle.</p>
+              <SkillRadar axes={stats.skills} />
+            </section>
+          )}
+
+          <section className="card p-5">
+            <h2 className="font-display text-xl font-bold">Winrate cumulé</h2>
             <p className="mb-3 text-sm text-mute">De la plus ancienne à la plus récente des {stats.games} games.</p>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
@@ -74,17 +83,17 @@ export function StatsPage() {
                       'Winrate cumulé'
                     ]}
                   />
-                  <Line type="monotone" dataKey="cumulativeWr" stroke="#3987e5" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                  <Line type="monotone" dataKey="cumulativeWr" stroke="var(--color-accent)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </section>
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-            <section className="rounded-lg border border-line bg-panel">
-              <h2 className="border-b border-line px-5 py-3 font-display text-xl font-semibold">Par champion</h2>
+            <section className="card">
+              <h2 className="px-5 pt-4 pb-2 font-display text-xl font-bold">Par champion</h2>
               <table className="w-full text-sm">
-                <thead className="text-left text-mute">
+                <thead className="text-left text-sm text-mute">
                   <tr>
                     <th className="px-5 py-2 font-medium">Champion</th>
                     <th className="px-2 text-right font-medium">Games</th>
@@ -95,10 +104,10 @@ export function StatsPage() {
                 </thead>
                 <tbody>
                   {stats.byChampion.map((c) => (
-                    <tr key={c.champion} className="border-t border-line/60">
+                    <tr key={c.champion} className="border-t border-line/60 hover:bg-panel-2/60">
                       <td className="px-5 py-2">
                         <div className="flex items-center gap-3">
-                          <ChampIcon name={c.champion} size={28} />
+                          <ChampIcon name={c.champion} size={36} className="rounded-lg" />
                           <span className="font-semibold">{c.champion}</span>
                         </div>
                       </td>
@@ -114,8 +123,8 @@ export function StatsPage() {
               </table>
             </section>
 
-            <section className="self-start rounded-lg border border-line bg-panel">
-              <h2 className="border-b border-line px-5 py-3 font-display text-xl font-semibold">Par rôle</h2>
+            <section className="self-start card">
+              <h2 className="px-5 pt-4 pb-2 font-display text-xl font-bold">Par rôle</h2>
               <ul className="px-5 py-3">
                 {stats.byPosition.map((p) => (
                   <li key={p.position} className="flex items-center gap-3 py-2">
@@ -137,22 +146,9 @@ export function StatsPage() {
 
 function Tile({ label, value, tone = '' }: { label: string; value: string; tone?: string }) {
   return (
-    <div className="rounded-lg border border-line bg-panel px-4 py-3">
-      <p className={`num text-3xl font-semibold ${tone}`}>{value}</p>
+    <div className="card px-5 py-4">
       <p className="text-sm text-mute">{label}</p>
-    </div>
-  )
-}
-
-function WrBar({ wins, games }: { wins: number; games: number }) {
-  const wr = wins / Math.max(1, games)
-  return (
-    <div className="flex items-center gap-2" title={`${wins} victoires sur ${games} games`}>
-      <div className="flex h-2 flex-1 gap-[2px] overflow-hidden rounded">
-        <div className="bg-win" style={{ width: `${wr * 100}%` }} />
-        <div className="flex-1 bg-loss/70" />
-      </div>
-      <span className={`num w-11 text-right text-base ${wrColor(wr)}`}>{pct(wr)}</span>
+      <p className={`num mt-1 text-4xl leading-none font-bold ${tone}`}>{value}</p>
     </div>
   )
 }

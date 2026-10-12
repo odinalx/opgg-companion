@@ -35,6 +35,7 @@ export interface RankedEntry {
   wins: number
   losses: number
   hotStreak: boolean
+  emblemUrl: string | null
 }
 
 export interface ChampionPoolEntry {
@@ -208,4 +209,18 @@ export interface StatsAggregate {
   byChampion: Array<{ champion: string; games: number; wins: number; kda: number; csPerMin: number }>
   byPosition: Array<{ position: Position; games: number; wins: number }>
   trend: Array<{ date: string; win: boolean; kda: number; opScore: number | null; cumulativeWr: number }>
+  skills: SkillAxis[]
+}
+
+export type SkillKey = 'combat' | 'farm' | 'damage' | 'vision' | 'survival' | 'economy'
+
+/** Un axe du radar : note 0..100 (50 = repère médian du rôle, 90 = très bon). */
+export interface SkillAxis {
+  key: SkillKey
+  label: string
+  overall: number
+  recent: number | null // 10 dernières games, null si moins de 10 games au total
+  rawOverall: number
+  rawRecent: number | null
+  unit: string
 }

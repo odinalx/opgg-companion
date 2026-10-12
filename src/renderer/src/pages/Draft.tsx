@@ -3,7 +3,7 @@ import type { DraftResultDto } from '@shared/api'
 import type { CriterionKey, DraftSlot, DraftState, DraftWeights, Position, Settings, Suggestion } from '@shared/types'
 import { CRITERIA, POSITIONS } from '@shared/types'
 import { useApp } from '../store'
-import { ChampIcon } from '../components/Icons'
+import { ChampIcon, Splash } from '../components/Icons'
 import { Button, Empty, Notice, PageHeader, Spinner } from '../components/ui'
 import { positionLabel } from '../lib/format'
 
@@ -73,14 +73,22 @@ export function DraftPage() {
   }, [JSON.stringify(state), JSON.stringify(settings.weights), settings.useModel, settings.candidatePool, settings.queueFilter])
 
   const isLive = useLive && !!live
+  const [top, ...rest] = result?.suggestions ?? []
 
   return (
     <>
-      <PageHeader title="Draft">
+      <PageHeader
+        title="Draft"
+        subtitle={
+          isLive
+            ? 'Sélection en cours : la composition se met à jour en direct.'
+            : 'Simulation : renseigne ton rôle et les picks connus. En vraie sélection, tout se remplit seul.'
+        }
+      >
         {live && (
-          <div className="flex rounded-md border border-line p-0.5 text-sm" role="group" aria-label="Source de la composition">
+          <div className="flex rounded-xl border border-line bg-panel p-1 text-sm" role="group" aria-label="Source de la composition">
             <ModeButton active={useLive} onClick={() => setUseLive(true)}>
-              Champ select en direct
+              En direct
             </ModeButton>
             <ModeButton active={!useLive} onClick={() => setUseLive(false)}>
               Simulation
@@ -88,35 +96,35 @@ export function DraftPage() {
           </div>
         )}
         {!isLive && (
-          <Button onClick={() => setManual(emptyDraft())}>Vider la composition</Button>
+          <Button variant="ghost" onClick={() => setManual(emptyDraft())}>
+            Vider la composition
+          </Button>
         )}
       </PageHeader>
 
-      {!live && (
-        <Notice>
-          Mode simulation : renseigne ton rôle et les champions déjà choisis. Pendant une vraie sélection, la composition se
-          remplit toute seule.
-        </Notice>
-      )}
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[19rem_minmax(0,1fr)_17rem]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[18.5rem_minmax(0,1fr)_17.5rem]">
         <Composition state={state} readOnly={isLive} onChange={setManual} />
 
-        <section aria-live="polite">
+        <section aria-live="polite" className="min-w-0">
           {error && <Notice tone="error">{error}</Notice>}
-          {result?.warnings.map((w) => (
-            <Notice key={w}>{w}</Notice>
-          ))}
           {!state.myPosition ? (
             <Empty title="Choisis ton rôle">Les suggestions dépendent de la lane que tu joues.</Empty>
           ) : !result && loading ? (
             <Spinner label="Analyse du draft…" />
-          ) : result && result.suggestions.length === 0 ? (
+          ) : result && !top ? (
             <Empty title="Aucun champion à proposer">
-              Élargis le pool de candidats dans le panneau de droite, ou vérifie les champions bannis.
+              Élargis le pool de candidats dans le panneau de droite, ou vérifie les bans.
             </Empty>
-          ) : result ? (
-            <SuggestionList result={result} loading={loading} />
+          ) : result && top ? (
+            <div className={`flex flex-col gap-3 transition-opacity ${loading ? 'opacity-60' : ''}`}>
+              <TopPick s={top} weights={result.weightsUsed} enemyLaner={result.enemyLaner} usedModel={result.usedModel} />
+              <SuggestionList suggestions={rest} weights={result.weightsUsed} />
+              {result.warnings.map((w) => (
+                <p key={w} className="text-sm text-mute">
+                  {w}
+                </p>
+              ))}
+            </div>
           ) : null}
         </section>
 
@@ -131,7 +139,7 @@ function ModeButton({ active, onClick, children }: { active: boolean; onClick: (
     <button
       onClick={onClick}
       aria-pressed={active}
-      className={`rounded px-3 py-1 font-semibold ${active ? 'bg-panel-2 text-ink' : 'text-mute hover:text-ink'}`}
+      className={`rounded-lg px-3.5 py-1.5 font-semibold ${active ? 'bg-panel-3 text-ink' : 'text-mute hover:text-ink'}`}
     >
       {children}
     </button>
@@ -155,105 +163,110 @@ function Composition({
     set({ [side]: state[side].map((s, j) => (j === i ? { ...s, ...slot } : s)) })
 
   return (
-    <section className="flex flex-col gap-5">
+    <section className="flex flex-col gap-4">
       <datalist id="champion-names">
         {champions.map((c) => (
           <option key={c.id} value={c.name} />
         ))}
       </datalist>
 
-      <div>
-        <h2 className="mb-2 font-display text-lg font-semibold">Ton rôle</h2>
-        <div className="grid grid-cols-5 gap-1" role="radiogroup" aria-label="Ton rôle">
-          {POSITIONS.map((p) => (
-            <button
-              key={p}
-              role="radio"
-              aria-checked={state.myPosition === p}
-              disabled={readOnly}
-              onClick={() => set({ myPosition: p })}
-              className={`rounded-md border py-1.5 text-sm font-semibold ${
-                state.myPosition === p ? 'border-gold bg-gold/15 text-gold' : 'border-line text-mute hover:text-ink'
-              } disabled:cursor-default`}
-            >
-              {positionLabel(p)}
-            </button>
-          ))}
+      <div className="card overflow-hidden border-win/25">
+        <div className="bg-gradient-to-b from-win/[0.12] to-transparent px-4 pt-4 pb-3">
+          <h2 className="font-display text-xl font-bold text-win">Ton équipe</h2>
+          <p className="mt-3 mb-1.5 text-sm text-soft">Ton rôle</p>
+          <div className="grid grid-cols-5 gap-1" role="radiogroup" aria-label="Ton rôle">
+            {POSITIONS.map((p) => (
+              <button
+                key={p}
+                role="radio"
+                aria-checked={state.myPosition === p}
+                disabled={readOnly}
+                onClick={() => set({ myPosition: p })}
+                className={`rounded-lg py-1.5 text-[13px] font-semibold transition-colors ${
+                  state.myPosition === p ? 'bg-accent text-night' : 'bg-panel-2 text-soft hover:text-ink'
+                } disabled:cursor-default`}
+              >
+                {positionLabel(p)}
+              </button>
+            ))}
+          </div>
         </div>
+        <SlotList slots={state.allies} readOnly={readOnly} withPosition onChange={(i, s) => setSlot('allies', i, s)} />
       </div>
 
-      <SlotGroup
-        title="Alliés"
-        slots={state.allies}
-        readOnly={readOnly}
-        withPosition
-        onChange={(i, s) => setSlot('allies', i, s)}
-      />
-      <SlotGroup title="Adversaires" slots={state.enemies} readOnly={readOnly} onChange={(i, s) => setSlot('enemies', i, s)} />
+      <div className="card overflow-hidden border-loss/25">
+        <div className="bg-gradient-to-b from-loss/[0.12] to-transparent px-4 pt-4 pb-1">
+          <h2 className="font-display text-xl font-bold text-loss">Adversaires</h2>
+        </div>
+        <SlotList slots={state.enemies} readOnly={readOnly} onChange={(i, s) => setSlot('enemies', i, s)} />
+      </div>
 
-      <div>
-        <h2 className="mb-2 font-display text-lg font-semibold">Bans</h2>
-        <div className="flex flex-wrap gap-1.5">
+      <div className="card p-4">
+        <h2 className="font-display text-lg font-bold">Bans</h2>
+        <div className="mt-2 flex flex-wrap gap-1.5">
           {state.bans.map((b) => (
             <button
               key={b}
               disabled={readOnly}
               onClick={() => set({ bans: state.bans.filter((x) => x !== b) })}
               title={readOnly ? b : `Retirer ${b}`}
-              className="flex items-center gap-1.5 rounded-md border border-line bg-panel py-0.5 pr-2 pl-0.5 text-sm"
+              className="relative"
             >
-              <ChampIcon name={b} size={22} className="grayscale" />
-              {b}
+              <ChampIcon name={b} size={36} className="rounded-lg opacity-70 grayscale" />
+              <span className="absolute inset-0 grid place-items-center" aria-hidden>
+                <span className="h-0.5 w-10 rotate-45 bg-loss" />
+              </span>
+              <span className="sr-only">{b}</span>
             </button>
           ))}
           {state.bans.length === 0 && <p className="text-sm text-mute">Aucun ban.</p>}
         </div>
         {!readOnly && (
-          <ChampionInput
-            placeholder="Ajouter un ban"
-            onPick={(c) => !state.bans.includes(c) && set({ bans: [...state.bans, c] })}
-            clearOnPick
-          />
+          <div className="mt-3 flex">
+            <ChampionInput
+              placeholder="Ajouter un ban"
+              onPick={(c) => !state.bans.includes(c) && set({ bans: [...state.bans, c] })}
+              clearOnPick
+            />
+          </div>
         )}
       </div>
     </section>
   )
 }
 
-function SlotGroup({
-  title,
+function SlotList({
   slots,
   readOnly,
   withPosition,
   onChange
 }: {
-  title: string
   slots: DraftSlot[]
   readOnly: boolean
   withPosition?: boolean
   onChange: (i: number, s: Partial<DraftSlot>) => void
 }) {
   return (
-    <div>
-      <h2 className="mb-2 font-display text-lg font-semibold">{title}</h2>
-      <ul className="flex flex-col gap-1.5">
-        {slots.map((s, i) => (
-          <li key={i} className="flex items-center gap-2">
-            <ChampIcon name={s.champion} size={32} />
-            {readOnly ? (
-              <span className={`flex-1 text-sm ${s.champion ? 'font-semibold' : 'text-mute'}`}>
-                {s.champion ?? 'En attente'}
-              </span>
+    <ul className="flex flex-col gap-1 px-2 pb-3">
+      {slots.map((s, i) => (
+        <li key={i} className="flex items-center gap-2.5 rounded-xl px-2 py-1.5">
+          <ChampIcon name={s.champion} size={38} className="rounded-lg" />
+          {readOnly ? (
+            <span className={`min-w-0 flex-1 truncate ${s.champion ? 'font-semibold' : 'text-mute'}`}>
+              {s.champion ?? 'En attente…'}
+            </span>
+          ) : (
+            <ChampionInput value={s.champion} placeholder="Champion" onPick={(c) => onChange(i, { champion: c || null })} />
+          )}
+          {withPosition &&
+            (readOnly ? (
+              <span className="text-xs text-mute">{positionLabel(s.position)}</span>
             ) : (
-              <ChampionInput value={s.champion} placeholder="Champion" onPick={(c) => onChange(i, { champion: c || null })} />
-            )}
-            {withPosition && (
               <select
                 aria-label={`Rôle de l'allié ${i + 1}`}
-                disabled={readOnly}
                 value={s.position ?? ''}
                 onChange={(e) => onChange(i, { position: (e.target.value || null) as Position | null })}
-                className="w-20 rounded-md border border-line bg-panel px-1.5 py-1 text-xs disabled:appearance-none"
+                className="field w-[4.5rem] px-1.5 py-1.5 text-xs"
               >
                 <option value="">Auto</option>
                 {POSITIONS.map((p) => (
@@ -262,11 +275,10 @@ function SlotGroup({
                   </option>
                 ))}
               </select>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
+            ))}
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -306,39 +318,92 @@ function ChampionInput({
       }}
       onBlur={() => commit(text)}
       onKeyDown={(e) => e.key === 'Enter' && commit(text)}
-      className="mt-0 min-w-0 flex-1 rounded-md border border-line bg-panel px-2.5 py-1 text-sm outline-none focus:border-gold"
+      className="field min-w-0 flex-1 px-3 py-1.5 text-sm"
     />
   )
 }
 
 // ---------------- Suggestions ----------------
 
-function SuggestionList({ result, loading }: { result: DraftResultDto; loading: boolean }) {
-  const [open, setOpen] = useState<string | null>(null)
-  const active = CRITERIA.filter((k) => result.weightsUsed[k].enabled && result.weightsUsed[k].weight > 0)
+/** Contribution de chaque critère actif au score : la somme des segments vaut le score. */
+function segments(s: Suggestion, weights: DraftWeights) {
+  const counted = CRITERIA.filter((k) => weights[k].enabled && weights[k].weight > 0 && s.components[k].value !== null)
+  const den = counted.reduce((a, k) => a + weights[k].weight, 0) || 1
+  return counted.map((k) => ({ k, width: ((weights[k].weight * (s.components[k].value ?? 0)) / den) * 100 }))
+}
+
+function ScoreBar({ s, weights, thick }: { s: Suggestion; weights: DraftWeights; thick?: boolean }) {
   return (
-    <div className={loading ? 'opacity-70 transition-opacity' : 'transition-opacity'}>
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="font-display text-xl font-semibold">Suggestions</h2>
-        <p className="text-sm text-mute">
-          {result.enemyLaner ? `Face à ${result.enemyLaner}` : 'Adversaire de lane inconnu'}
-          {result.usedModel && ' · poids appris sur ton historique'}
-        </p>
-      </div>
-      <ol className="flex flex-col gap-2">
-        {result.suggestions.map((s, i) => (
-          <SuggestionRow
-            key={s.champion}
-            s={s}
-            rank={i + 1}
-            weights={result.weightsUsed}
-            active={active}
-            open={open === s.champion}
-            onToggle={() => setOpen(open === s.champion ? null : s.champion)}
-          />
-        ))}
-      </ol>
+    <div className={`flex gap-[2px] overflow-hidden rounded-full bg-white/[0.06] ${thick ? 'h-3' : 'h-2'}`} aria-hidden>
+      {segments(s, weights).map(({ k, width }) => (
+        <div key={k} style={{ width: `${width}%`, background: COLOR_VAR[k] }} title={CRITERION_LABELS[k].name} />
+      ))}
     </div>
+  )
+}
+
+function TopPick({
+  s,
+  weights,
+  enemyLaner,
+  usedModel
+}: {
+  s: Suggestion
+  weights: DraftWeights
+  enemyLaner: string | null
+  usedModel: boolean
+}) {
+  return (
+    <article className="hero">
+      <Splash name={s.champion} />
+      <div className="flex min-h-[300px] flex-col justify-end gap-5 p-7">
+        <div className="flex items-end justify-between gap-6">
+          <div className="min-w-0">
+            <p className="font-semibold text-accent">
+              Meilleur choix{enemyLaner ? ` face à ${enemyLaner}` : ''}
+              {usedModel ? ' · poids appris sur ton historique' : ''}
+            </p>
+            <h2 className="font-display text-7xl leading-[0.9] font-bold tracking-tight">{s.champion}</h2>
+            <p className="mt-3 max-w-xl text-soft">{s.summary}</p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="num text-8xl leading-[0.8] font-bold text-accent">{Math.round(s.score)}</p>
+            <p className="mt-2 text-sm text-soft">score sur 100</p>
+          </div>
+        </div>
+        <div className="max-w-2xl">
+          <ScoreBar s={s} weights={weights} thick />
+          <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
+            {CRITERIA.filter((k) => weights[k].enabled && s.components[k].value !== null).map((k) => (
+              <li key={k} className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: COLOR_VAR[k] }} />
+                <span className="text-soft">{CRITERION_LABELS[k].name}</span>
+                <span className="num text-base font-semibold">{Math.round((s.components[k].value ?? 0) * 100)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function SuggestionList({ suggestions, weights }: { suggestions: Suggestion[]; weights: DraftWeights }) {
+  const [open, setOpen] = useState<string | null>(null)
+  if (!suggestions.length) return null
+  return (
+    <ol className="card divide-y divide-line/70 overflow-hidden">
+      {suggestions.map((s, i) => (
+        <SuggestionRow
+          key={s.champion}
+          s={s}
+          rank={i + 2}
+          weights={weights}
+          open={open === s.champion}
+          onToggle={() => setOpen(open === s.champion ? null : s.champion)}
+        />
+      ))}
+    </ol>
   )
 }
 
@@ -346,55 +411,46 @@ function SuggestionRow({
   s,
   rank,
   weights,
-  active,
   open,
   onToggle
 }: {
   s: Suggestion
   rank: number
   weights: DraftWeights
-  active: CriterionKey[]
   open: boolean
   onToggle: () => void
 }) {
-  // Contribution de chaque critère au score final : la somme des segments = le score.
-  const counted = active.filter((k) => s.components[k].value !== null)
-  const den = counted.reduce((a, k) => a + weights[k].weight, 0) || 1
-  const segments = counted.map((k) => ({ k, width: ((weights[k].weight * (s.components[k].value ?? 0)) / den) * 100 }))
-
   return (
-    <li className={`rounded-lg border bg-panel ${rank === 1 ? 'border-gold/60' : 'border-line'}`}>
-      <button onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-4 px-4 py-3 text-left">
-        <span className="num w-5 text-lg text-mute">{rank}</span>
-        <ChampIcon name={s.champion} size={52} />
+    <li>
+      <button onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-panel-2/60">
+        <span className="num w-5 text-center text-lg text-mute">{rank}</span>
+        <ChampIcon name={s.champion} size={46} className="rounded-xl" />
         <div className="min-w-0 flex-1">
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="font-display text-2xl leading-none font-semibold">{s.champion}</p>
-            <p className="num text-3xl leading-none font-bold text-gold">{Math.round(s.score)}</p>
+          <div className="flex items-baseline gap-3">
+            <p className="font-display text-2xl leading-none font-bold">{s.champion}</p>
+            <p className="min-w-0 truncate text-sm text-mute">{s.summary}</p>
           </div>
-          <div className="mt-2 flex h-2.5 gap-[2px] overflow-hidden rounded-full bg-panel-2" aria-hidden>
-            {segments.map(({ k, width }) => (
-              <div key={k} style={{ width: `${width}%`, background: COLOR_VAR[k] }} title={CRITERION_LABELS[k].name} />
-            ))}
+          <div className="mt-2">
+            <ScoreBar s={s} weights={weights} />
           </div>
-          <p className="mt-1.5 truncate text-sm text-mute">{s.summary}</p>
         </div>
+        <p className="num w-14 text-right text-4xl leading-none font-bold">{Math.round(s.score)}</p>
       </button>
       {open && (
-        <table className="mx-4 mb-3 w-[calc(100%-2rem)] text-sm">
+        <table className="mb-3 ml-[4.75rem] w-[calc(100%-6rem)] text-sm">
           <caption className="sr-only">Détail du score de {s.champion}</caption>
           <tbody>
             {CRITERIA.map((k) => {
               const c = s.components[k]
-              const off = !active.includes(k)
+              const off = !weights[k].enabled || weights[k].weight === 0
               return (
                 <tr key={k} className={`border-t border-line/60 ${off ? 'opacity-45' : ''}`}>
-                  <td className="py-1.5 pr-3">
+                  <td className="w-40 py-1.5 pr-3">
                     <span className="mr-2 inline-block h-2.5 w-2.5 rounded-sm" style={{ background: COLOR_VAR[k] }} />
                     {CRITERION_LABELS[k].name}
                   </td>
-                  <td className="num w-14 text-right text-base">{c.value === null ? '—' : Math.round(c.value * 100)}</td>
-                  <td className="pl-4 text-mute">
+                  <td className="num w-12 text-right text-base">{c.value === null ? '—' : Math.round(c.value * 100)}</td>
+                  <td className="pl-4 text-soft">
                     {c.label}
                     {off && ' (désactivé)'}
                   </td>
@@ -423,8 +479,11 @@ function CriteriaPanel({
     void onChange({ weights: { ...settings.weights, [k]: { ...settings.weights[k], ...patch } } })
 
   return (
-    <aside className="flex flex-col gap-4 self-start rounded-lg border border-line bg-panel p-4">
-      <h2 className="font-display text-lg font-semibold">Critères</h2>
+    <aside className="card flex flex-col gap-5 self-start p-5">
+      <div>
+        <h2 className="font-display text-xl font-bold">Critères</h2>
+        <p className="mt-0.5 text-sm text-mute">Active ce qui compte pour toi et règle son poids.</p>
+      </div>
       {CRITERIA.map((k) => {
         const c = settings.weights[k]
         return (
@@ -434,7 +493,7 @@ function CriteriaPanel({
                 type="checkbox"
                 checked={c.enabled}
                 onChange={(e) => setCriterion(k, { enabled: e.target.checked })}
-                className="h-4 w-4 accent-[var(--color-gold)]"
+                className="h-4 w-4 accent-[var(--color-accent)]"
               />
               <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: COLOR_VAR[k] }} aria-hidden />
               {CRITERION_LABELS[k].name}
@@ -449,7 +508,7 @@ function CriteriaPanel({
               disabled={!c.enabled || usedModel}
               onChange={(e) => setCriterion(k, { weight: Number(e.target.value) })}
               aria-label={`Poids : ${CRITERION_LABELS[k].name}`}
-              className="mt-1 w-full accent-[var(--color-gold)] disabled:opacity-40"
+              className="mt-1 w-full accent-[var(--color-accent)] disabled:opacity-40"
             />
             <p className="text-xs text-mute">{CRITERION_LABELS[k].help}</p>
           </div>
@@ -460,7 +519,7 @@ function CriteriaPanel({
           Les poids viennent du modèle entraîné sur ton historique. Désactive-le dans les réglages pour les régler à la main.
         </p>
       )}
-      <div className="border-t border-line pt-3">
+      <div className="border-t border-line pt-4">
         <label className="text-sm font-semibold" htmlFor="pool">
           Champions proposés
         </label>
@@ -468,7 +527,7 @@ function CriteriaPanel({
           id="pool"
           value={settings.candidatePool}
           onChange={(e) => void onChange({ candidatePool: e.target.value as Settings['candidatePool'] })}
-          className="mt-1 w-full rounded-md border border-line bg-panel-2 px-2 py-1.5 text-sm"
+          className="field mt-1.5 w-full px-2.5 py-2 text-sm"
         >
           <option value="played">Ceux que je joue</option>
           <option value="owned">Tous ceux que je possède</option>

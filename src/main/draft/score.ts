@@ -50,7 +50,7 @@ export function masteryComponent(c: CandidateInput): CriterionResult {
   const { points, level } = c.mastery
   // 1 000 000 points ≈ maximum de l'échelle (log pour ne pas écraser les petits pools).
   const value = clamp01(Math.log10(points + 1) / 6)
-  return { value, label: points > 0 ? `mastery ${level} (${formatPoints(points)} pts)` : 'aucune mastery' }
+  return { value, label: points > 0 ? `mastery ${level} (${formatPoints(points)} pts)` : 'pas de mastery' }
 }
 
 export function metaComponent(c: CandidateInput): CriterionResult {
@@ -120,7 +120,7 @@ function summarize(components: Record<CriterionKey, CriterionResult>, weights: D
     .sort((a, b) => b.v - a.v)
   const parts = active.filter((a) => a.v >= 0.6).slice(0, 2).map((a) => a.label)
   const worst = active[active.length - 1]
-  if (worst && worst.v <= 0.3) parts.push(`attention : ${worst.label}`)
+  if (worst && worst.v <= 0.3) parts.push(`point faible : ${worst.label}`)
   return parts.join(' · ') || active.slice(0, 2).map((a) => a.label).join(' · ')
 }
 

@@ -158,28 +158,44 @@ function findEntry<T>(table: Record<string, T>, champion: string): T | undefined
 
 /**
  * Devine la position des champions dont le rôle n'est pas connu (cas des ennemis en
- * champ select) : affectation gloutonne selon la popularité du champion sur chaque lane.
+ * champ select). Recherche exhaustive (5 slots au plus) de l'affectation qui maximise
+ * la somme des taux de rôle : la part des games de chaque champion jouées sur cette lane.
  */
 export function assignPositions(
   slots: Array<{ champion: string | null; position: Position | null }>,
   meta: Record<Position, LaneMetaEntry[]>,
   reserved: Position[] = []
 ): Array<{ champion: string | null; position: Position | null }> {
-  const used = new Set<Position>([...reserved, ...slots.map((s) => s.position).filter((p): p is Position => !!p)])
   const out = slots.map((s) => ({ ...s }))
-  const pending: Array<{ idx: number; pos: Position; play: number }> = []
-  out.forEach((s, idx) => {
-    if (s.position || !s.champion) return
-    for (const pos of POSITIONS) {
-      const e = meta[pos]?.find((m) => same(m.champion, s.champion!))
-      if (e) pending.push({ idx, pos, play: e.play })
-    }
+  const free = POSITIONS.filter((p) => !reserved.includes(p) && !slots.some((s) => s.position === p))
+  const unknown = out.map((s, idx) => ({ s, idx })).filter(({ s }) => !s.position && s.champion)
+
+  // Taux de rôle de chaque champion inconnu sur chaque position libre.
+  const share = unknown.map(({ s }) => {
+    const plays = POSITIONS.map((pos) => meta[pos]?.find((m) => same(m.champion, s.champion!))?.play ?? 0)
+    const total = plays.reduce((a, b) => a + b, 0)
+    return Object.fromEntries(POSITIONS.map((pos, i) => [pos, total ? plays[i] / total : 0])) as Record<Position, number>
   })
-  pending.sort((a, b) => b.play - a.play)
-  for (const p of pending) {
-    if (out[p.idx].position || used.has(p.pos)) continue
-    out[p.idx].position = p.pos
-    used.add(p.pos)
+
+  let best: { score: number; picks: Array<Position | null> } = { score: -1, picks: [] }
+  const search = (i: number, used: Set<Position>, picks: Array<Position | null>, score: number): void => {
+    if (i === unknown.length) {
+      if (score > best.score) best = { score, picks: [...picks] }
+      return
+    }
+    for (const pos of free) {
+      if (used.has(pos) || share[i][pos] === 0) continue
+      used.add(pos)
+      picks.push(pos)
+      search(i + 1, used, picks, score + share[i][pos])
+      picks.pop()
+      used.delete(pos)
+    }
+    picks.push(null) // champion laissé sans rôle
+    search(i + 1, used, picks, score)
+    picks.pop()
   }
+  search(0, new Set(), [], 0)
+  unknown.forEach(({ idx }, i) => (out[idx].position = best.picks[i] ?? null))
   return out
 }

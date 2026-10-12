@@ -15,7 +15,7 @@
     "test": "vitest run",
     "build:win": "electron-vite build && electron-builder --win --x64",
     "mock:lcu": "node scripts/mock-lcu.mjs",
-    "smoke:opgg": "electron-vite build && node scripts/smoke-opgg.mjs"
+    "smoke:opgg": "SMOKE=1 vitest run scripts/smoke-opgg.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",

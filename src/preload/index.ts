@@ -15,7 +15,9 @@ const methods: ApiMethod[] = [
   'suggest',
   'getModel',
   'trainModel',
-  'openExternal'
+  'openExternal',
+  'launchRiotClient',
+  'signOut'
 ]
 
 function subscribe<T>(channel: string, cb: (payload: T) => void): () => void {

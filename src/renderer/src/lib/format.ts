@@ -36,7 +36,7 @@ const POSITION_LABELS: Record<string, string> = {
 }
 export const positionLabel = (p: string | null): string => (p ? (POSITION_LABELS[p] ?? p) : '—')
 
-export const wrColor = (wr: number): string => (wr >= 0.6 ? 'text-gold' : wr >= 0.5 ? 'text-win' : 'text-loss')
+export const wrColor = (wr: number): string => (wr >= 0.6 ? 'text-accent' : wr >= 0.5 ? 'text-win' : 'text-loss')
 
 export function tierLabel(tier: string | null, division: number | null, lp: number | null): string {
   if (!tier) return 'Non classé'

@@ -46,7 +46,10 @@ export function MatchesPage() {
 
   return (
     <>
-      <PageHeader title="Historique">
+      <PageHeader
+        title="Historique"
+        subtitle={matches ? `${shown.length} games · OP.GG fournit les 20 dernières, le client LoL jusqu'à 100 : l'historique s'allonge à chaque synchro.` : undefined}
+      >
         <Select value={queue} onChange={setQueue} label="File">
           <option value="all">Toutes les files</option>
           {queues.map((q) => (
@@ -82,11 +85,7 @@ export function MatchesPage() {
         </Empty>
       ) : (
         <>
-          <p className="mb-3 text-sm text-mute">
-            {shown.length} games enregistrées. L'historique s'allonge à chaque synchronisation : OP.GG fournit les 20
-            dernières, le client LoL jusqu'à 100.
-          </p>
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col gap-2.5">
             {shown.map((m) => (
               <MatchRow key={m.id} match={m} open={open === m.id} onToggle={() => setOpen(open === m.id ? null : m.id)} />
             ))}
@@ -113,7 +112,7 @@ function Select({
       aria-label={label}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="rounded-md border border-line bg-panel px-2.5 py-1.5 text-sm"
+      className="field px-3 py-2 text-sm"
     >
       {children}
     </select>
@@ -122,52 +121,74 @@ function Select({
 
 function MatchRow({ match: m, open, onToggle }: { match: MatchSummary; open: boolean; onToggle: () => void }) {
   const mins = m.durationSec / 60 || 1
-  const accent = m.remake ? 'bg-mute' : m.win ? 'bg-win' : 'bg-loss'
+  const tone = m.remake ? 'mute' : m.win ? 'win' : 'loss'
+  const tint = { win: 'bg-win/[0.07] border-win/25', loss: 'bg-loss/[0.07] border-loss/25', mute: 'bg-panel border-line' }[tone]
+  const text = { win: 'text-win', loss: 'text-loss', mute: 'text-mute' }[tone]
+  const showOpScore = m.opScore !== null && m.opScore > 0
   return (
-    <li className="overflow-hidden rounded-lg border border-line bg-panel">
-      <button onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-4 py-2.5 pr-4 text-left hover:bg-panel-2">
-        <span className={`w-1 self-stretch ${accent}`} />
-        <div className="w-28 shrink-0">
-          <p className={`font-display text-lg font-semibold ${m.remake ? 'text-mute' : m.win ? 'text-win' : 'text-loss'}`}>
-            {m.remake ? 'Remake' : m.win ? 'Victoire' : 'Défaite'}
-          </p>
-          <p className="text-xs text-mute">{queueLabel(m.queue)}</p>
+    <li className={`overflow-hidden rounded-[14px] border ${tint}`}>
+      <button
+        onClick={onToggle}
+        aria-expanded={open}
+        className="grid w-full grid-cols-[6.5rem_auto_8.5rem_9rem_minmax(0,1fr)_auto] items-center gap-5 px-5 py-3 text-left hover:bg-white/[0.02]"
+      >
+        <div>
+          <p className={`font-display text-xl leading-none font-bold ${text}`}>{m.remake ? 'Remake' : m.win ? 'Victoire' : 'Défaite'}</p>
+          <p className="mt-1.5 text-sm text-soft">{queueLabel(m.queue)}</p>
           <p className="text-xs text-mute">
             {duration(m.durationSec)} · {timeAgo(m.createdAt)}
           </p>
         </div>
         <div className="flex items-center gap-1.5">
-          <ChampIcon name={m.champion} size={48} />
-          <div className="flex flex-col gap-0.5">
-            {m.spells.slice(0, 2).map((s, i) => (
-              <SpellIcon key={i} id={s} size={22} />
+          <div className="relative">
+            <ChampIcon name={m.champion} size={56} className="rounded-xl" />
+            {m.position && (
+              <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 rounded-md bg-night px-1.5 text-[10px] font-semibold text-soft">
+                {positionLabel(m.position)}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            {m.spells.slice(0, 2).map((sp, i) => (
+              <SpellIcon key={i} id={sp} size={25} />
             ))}
           </div>
-          <div className="flex flex-col gap-0.5">
-            <RuneIcon id={m.primaryRune} size={22} />
-            <RuneIcon id={m.secondaryPage} size={22} />
+          <div className="flex flex-col gap-1">
+            <RuneIcon id={m.primaryRune} size={25} />
+            <RuneIcon id={m.secondaryPage} size={25} />
           </div>
         </div>
-        <div className="w-32 shrink-0">
-          <p className="num text-xl font-semibold">
-            {m.kills} / <span className="text-loss">{m.deaths}</span> / {m.assists}
+        <div>
+          <p className="num text-2xl leading-none font-bold">
+            {m.kills}
+            <span className="text-mute"> / </span>
+            <span className="text-loss">{m.deaths}</span>
+            <span className="text-mute"> / </span>
+            {m.assists}
           </p>
-          <p className="text-xs text-mute">{kda(m.kills, m.deaths, m.assists)} KDA</p>
+          <p className="mt-1 text-sm text-soft">{kda(m.kills, m.deaths, m.assists)} KDA</p>
         </div>
-        <div className="w-36 shrink-0 text-xs text-mute">
-          <p>
-            {m.cs} CS ({(m.cs / mins).toFixed(1)}/min)
-          </p>
-          <p>{Math.round(m.damage / 1000)}k dégâts</p>
-          <p>{positionLabel(m.position)}{m.opScore !== null && ` · OP score ${m.opScore.toFixed(1)}`}</p>
-        </div>
-        <div className="flex flex-wrap gap-0.5">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-2 text-sm">
+          <dt className="text-mute">CS</dt>
+          <dd className="num text-base">
+            {m.cs} <span className="text-mute">({(m.cs / mins).toFixed(1)})</span>
+          </dd>
+          <dt className="text-mute">Dégâts</dt>
+          <dd className="num text-base">{(m.damage / 1000).toFixed(1)}k</dd>
+          {showOpScore && (
+            <>
+              <dt className="text-mute">OP score</dt>
+              <dd className="num text-base">{m.opScore!.toFixed(1)}</dd>
+            </>
+          )}
+        </dl>
+        <div className="flex flex-wrap gap-1">
           {m.items.map((it, i) => (
-            <ItemIcon key={i} id={it} size={28} />
+            <ItemIcon key={i} id={it} size={32} />
           ))}
         </div>
-        <span className="ml-auto text-mute" aria-hidden>
-          {open ? '▴' : '▾'}
+        <span className={`text-mute transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
         </span>
       </button>
       {open && <MatchDetailView match={m} />}
@@ -184,13 +205,13 @@ function MatchDetailView({ match }: { match: MatchSummary }) {
     window.api.getMatchDetail(account, match).then(setDetail, (e) => setError((e as Error).message))
   }, [account, match])
 
-  if (error) return <p className="border-t border-line px-5 py-4 text-sm text-loss">Détail indisponible : {error}</p>
-  if (!detail) return <div className="border-t border-line px-5"><Spinner label="Chargement du détail…" /></div>
+  if (error) return <p className="border-t border-line/70 px-5 py-4 text-sm text-loss">Détail indisponible : {error}</p>
+  if (!detail) return <div className="border-t border-line/70 px-5"><Spinner label="Chargement du détail…" /></div>
   const maxDmg = Math.max(1, ...detail.teams.flatMap((t) => t.participants.map((p) => p.damage)))
   const mins = match.durationSec / 60 || 1
 
   return (
-    <div className="grid grid-cols-1 gap-4 border-t border-line p-4 2xl:grid-cols-2">
+    <div className="grid grid-cols-1 gap-5 border-t border-line/70 bg-night/40 p-5 2xl:grid-cols-2">
       {detail.teams.map((t) => (
         <div key={t.key}>
           <div className="mb-2 flex items-baseline justify-between">
@@ -201,7 +222,7 @@ function MatchDetailView({ match }: { match: MatchSummary }) {
               {t.kills} kills · {Math.round(t.gold / 1000)}k or · {t.towers} tours · {t.dragons} dragons · {t.barons} barons
             </p>
           </div>
-          <table className="w-full text-xs">
+          <table className="w-full text-[13px]">
             <thead className="text-left text-mute">
               <tr>
                 <th className="py-1 font-medium">Joueur</th>
@@ -214,12 +235,12 @@ function MatchDetailView({ match }: { match: MatchSummary }) {
             </thead>
             <tbody>
               {t.participants.map((p, i) => (
-                <tr key={i} className={`border-t border-line/50 ${p.isTarget ? 'bg-gold/10' : ''}`}>
+                <tr key={i} className={`border-t border-line/50 ${p.isTarget ? 'bg-accent/10' : ''}`}>
                   <td className="py-1.5">
                     <div className="flex items-center gap-2">
-                      <ChampIcon name={p.champion} size={28} />
+                      <ChampIcon name={p.champion} size={32} className="rounded-lg" />
                       <div className="min-w-0">
-                        <p className={`truncate font-semibold ${p.isTarget ? 'text-gold' : ''}`}>{p.gameName}</p>
+                        <p className={`truncate font-semibold ${p.isTarget ? 'text-accent' : ''}`}>{p.gameName}</p>
                         <p className="text-mute">
                           {positionLabel(p.position)} · niv. {p.level}
                           {p.opScoreRank === 1 && ' · MVP'}
@@ -243,7 +264,7 @@ function MatchDetailView({ match }: { match: MatchSummary }) {
                   <td>
                     <div className="flex gap-0.5">
                       {p.items.map((it, j) => (
-                        <ItemIcon key={j} id={it} size={20} />
+                        <ItemIcon key={j} id={it} size={24} />
                       ))}
                     </div>
                   </td>
