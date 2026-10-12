@@ -13,7 +13,7 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
-    "build:win": "electron-vite build && electron-builder --win --x64",
+    "build:win": "electron-vite build && electron-builder --win --x64 --publish never",
     "mock:lcu": "node scripts/mock-lcu.mjs",
     "smoke:opgg": "SMOKE=1 vitest run scripts/smoke-opgg.test.ts"
   },
