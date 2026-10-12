@@ -223,19 +223,19 @@ const METRIC_LABELS: Record<OverlayMetric, string> = {
   kp: 'Participation aux kills'
 }
 
-const CORNERS: Array<{ value: OverlaySettings['corner']; label: string }> = [
-  { value: 'top-left', label: 'En haut à gauche' },
-  { value: 'top-right', label: 'En haut à droite' },
-  { value: 'bottom-left', label: 'En bas à gauche' },
-  { value: 'bottom-right', label: 'En bas à droite' }
-]
-
 function OverlaySection() {
   const { settings, updateSettings } = useApp()
   const o = settings!.overlay
   const set = (patch: Partial<OverlaySettings>): void => void updateSettings({ overlay: { ...o, ...patch } })
   const [displays, setDisplays] = useState<DisplayInfo[]>([])
-  useEffect(() => void window.api.getDisplays().then(setDisplays), [])
+  const [inGame, setInGame] = useState(false)
+  useEffect(() => {
+    void window.api.getDisplays().then(setDisplays)
+    const check = () => void window.api.isInGame().then(setInGame)
+    check()
+    const t = setInterval(check, 3000)
+    return () => clearInterval(t)
+  }, [])
 
   return (
     <section>
@@ -304,19 +304,22 @@ function OverlaySection() {
             </label>
           )}
           {o.mode === 'overlay' && (
-          <label className="text-sm">
-            <span className="mb-1 block text-mute">Position</span>
-            <select value={o.corner} onChange={(e) => set({ corner: e.target.value as OverlaySettings['corner'] })} className="field w-full px-2.5 py-2">
-              {CORNERS.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            <div>
+              <span className="mb-1 block text-sm text-mute">Position des éléments</span>
+              <Button disabled={!inGame} onClick={() => void window.api.setOverlayEditing(true)}>
+                Déplacer les éléments
+              </Button>
+              <p className="mt-1.5 text-xs text-mute">
+                En partie, chaque stat se place à la souris ({o.editKey.replace('Control', 'Ctrl').replaceAll('+', ' + ')} depuis le
+                jeu).
+              </p>
+            </div>
           )}
           <HotkeyInput label="Afficher / masquer l'overlay" value={o.toggleKey} onChange={(toggleKey) => set({ toggleKey })} />
           <HotkeyInput label="Afficher le build" value={o.buildKey} onChange={(buildKey) => set({ buildKey })} />
+          {o.mode === 'overlay' && (
+            <HotkeyInput label="Déplacer les éléments" value={o.editKey} onChange={(editKey) => set({ editKey })} />
+          )}
         </div>
       </fieldset>
 
@@ -353,14 +356,10 @@ function ScoreboardCalibration({ o, set }: { o: OverlaySettings; set: (p: Partia
     <div className="card mt-5 p-4">
       <h3 className="font-display text-lg font-bold">Position sur le tableau des scores</h3>
       <p className="mt-1 text-sm text-soft">
-        À régler une fois : en partie, coche « afficher en continu », ouvre le tableau (Tab) et aligne les chiffres sur sa
-        ligne centrale, un par lane. Ta résolution change la taille du tableau.
+        À régler une fois : en partie, ouvre le tableau (Tab) avec « afficher en continu » coché, déplace le groupe de
+        chiffres sur la ligne centrale (bouton « Déplacer les éléments »), puis ajuste l'écart entre les lignes.
       </p>
-      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {slider('Horizontal', 'x', 30, 70, 0.1)}
-        {slider('1re ligne (top)', 'y', 15, 70, 0.1)}
-        {slider('Écart entre lignes', 'spacing', 3, 12, 0.1)}
-      </div>
+      <div className="mt-3 max-w-sm">{slider('Écart entre lignes', 'spacing', 3, 12, 0.1)}</div>
       <div className="mt-3 flex flex-wrap gap-5 text-sm">
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={sb.calibrate} onChange={(e) => setSb({ calibrate: e.target.checked })} className="h-4 w-4 accent-[var(--color-accent)]" />

@@ -49,6 +49,8 @@ const handlers: { [K in ApiMethod]: (...args: Parameters<Api[K]>) => ReturnType<
   getMatchupBuild: (champion, position, opponent) => service.opgg.getMatchupBuild(champion, position, opponent),
   getProBuilds: (champion, position, opponent) => service.getProBuilds(champion, position, opponent),
   importBuildData: (build, parts) => service.importBuildData(build, parts),
+  setOverlayEditing: async (on) => overlay.setEditing(on),
+  isInGame: () => overlay.inGame(),
   getOverlayState: () => ({ stats: overlay.getStats(), ui: overlay.getUi(), settings: service.getSettings().overlay }),
   getDisplays: () => {
     const primary = screen.getPrimaryDisplay().id
@@ -80,7 +82,9 @@ function createWindow(): void {
     webPreferences: {
       preload: join(here, '../preload/index.cjs'),
       contextIsolation: true,
-      sandbox: true
+      sandbox: true,
+      // Mode capture : l'overlay plein écran masque la fenêtre, qui ne doit pas ralentir pour autant.
+      backgroundThrottling: !capture
     }
   })
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -127,6 +131,11 @@ async function captureAllPages(w: BrowserWindow, dir: string): Promise<void> {
       overlay.setUi({ showBuild: false, tabHeld: true })
       await wait(1500)
       writeFileSync(join(dir, 'overlay-tab.png'), (await ow.webContents.capturePage()).toPNG())
+      overlay.setUi({ tabHeld: false })
+      overlay.setEditing(true)
+      await wait(2500)
+      writeFileSync(join(dir, 'overlay-edit.png'), (await ow.webContents.capturePage()).toPNG())
+      overlay.setEditing(false)
     } else writeFileSync(join(dir, 'overlay-missing.txt'), 'aucune partie détectée')
   }
   // OPGG_CAPTURE_SIM="jungle|Ahri,Garen|Vi,Jinx,Darius" : simulation de draft (rôle|alliés|ennemis).

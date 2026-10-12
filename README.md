@@ -5,7 +5,8 @@ Application Windows (Electron + React) pour League of Legends :
 - **Connexion** : « Se connecter avec Riot » ouvre le Riot Client officiel ; une fois LoL lancé, le compte est détecté automatiquement (API locale du client, lecture seule, aucun mot de passe ne passe par l'app). Sans lancer le jeu, on peut consulter n'importe quel Riot ID.
 - **Profil & historique** : rang, LP, champions de la saison, historique détaillé (KDA, CS/min, dégâts, vision, items, runes, détail des 10 joueurs). L'historique est conservé localement et s'enrichit à chaque synchronisation.
 - **Stats** : radar hexagonal du profil de jeu (combat, farm, dégâts, vision, survie, économie) et tuiles comparées aux médianes de ton elo (ou d'un palier au choix, de Fer à Master+), winrate cumulé, stats par champion et par rôle.
-- **Draft helper** : pendant la sélection des champions, propose des picks classés selon cinq critères activables et pondérables :
+- **Draft helper** : pendant la sélection des champions, propose des picks classés selon cinq critères activables et pondérables
+  (méta, matchups et synergies : statistiques OP.GG des parties classées Émeraude+ du patch en cours) :
   winrate perso (lissé), mastery, méta du rôle, matchup contre l'adversaire de lane, synergie avec les alliés.
   Un modèle optionnel (régression logistique) apprend les poids à partir de ton historique.
   En classée solo, seul l'historique solo compte ; en flex, solo + flex.

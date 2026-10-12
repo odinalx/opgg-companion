@@ -1,23 +1,17 @@
 import { type ReactNode, useEffect, useState } from 'react'
-import type { ChampionBuild, LiveStats, OverlaySettings, OverlayUi } from '@shared/types'
-import { TIER_LABELS } from '@shared/types'
+import type { ChampionBuild, LiveStats, OverlaySettings, OverlayUi, OverlayWidget, WidgetPosition } from '@shared/types'
+import { DEFAULT_POSITIONS, TIER_LABELS } from '@shared/types'
 import { useApp } from './store'
 import { ChampIcon, ItemIcon, RuneIcon } from './components/Icons'
 import { positionLabel } from './lib/format'
 
-const CORNER: Record<OverlaySettings['corner'], string> = {
-  // Décalages choisis pour ne pas couvrir le score (haut droite) ni la minimap (bas droite).
-  'top-left': 'top-3 left-3',
-  'top-right': 'top-14 right-3',
-  'bottom-left': 'bottom-44 left-3',
-  'bottom-right': 'bottom-72 right-3'
-}
-
 const pretty = (key: string): string => key.replace('Control', 'Ctrl').replaceAll('+', ' + ')
 
+const SHADOW = '[text-shadow:0_1px_2px_#000,0_0_6px_#000]'
+
 export function Overlay() {
-  const [stats, setStats] = useState<LiveStats | null>(null)
-  const [ui, setUi] = useState<OverlayUi>({ visible: true, showBuild: false, tabHeld: false })
+  const [live, setStats] = useState<LiveStats | null>(null)
+  const [ui, setUi] = useState<OverlayUi>({ visible: true, showBuild: false, tabHeld: false, editing: false })
   const [settings, setSettings] = useState<OverlaySettings | null>(null)
 
   useEffect(() => {
@@ -37,63 +31,157 @@ export function Overlay() {
     return () => offs.forEach((off) => off())
   }, [])
 
-  if (settings?.mode === 'window') return <LiveWindow stats={stats} settings={settings} />
+  if (settings?.mode === 'window') return <LiveWindow stats={live} settings={settings} />
+  const stats = live
   if (!stats || !settings || !ui.visible) return null
+  const editing = ui.editing
+  const m = settings.metrics
+  const pos = settings.positions
+
+  // Enregistre une nouvelle position (le main la renvoie à l'overlay via les réglages).
+  const save = (patch: Partial<OverlaySettings>): void => {
+    const next = { ...settings, ...patch }
+    setSettings(next)
+    void window.api.setSettings({ overlay: next })
+  }
+  const move = (id: OverlayWidget) => (p: WidgetPosition) => save({ positions: { ...pos, [id]: p } })
+
+  const csDelta = stats.bench ? Math.round(stats.cs - stats.csExpected) : null
+  const visionDelta = stats.bench ? stats.visionPerMin - stats.bench.visionPerMin : null
 
   return (
-    <div className="pointer-events-none fixed inset-0 select-none">
-      <Hud stats={stats} settings={settings} />
-      {settings.goldDiffOnTab && (ui.tabHeld || settings.scoreboard.calibrate) && (
-        <ScoreboardGold stats={stats} layout={settings.scoreboard} />
+    <div className={`fixed inset-0 select-none ${editing ? 'bg-black/30' : 'pointer-events-none'}`}>
+      {editing && <EditBar settings={settings} onReset={() => save({ positions: DEFAULT_POSITIONS, scoreboard: { ...settings.scoreboard, x: 50, y: 38 } })} />}
+
+      {m.cs && (
+        <Movable label="CS" pos={pos.cs} editing={editing} onMove={move('cs')}>
+          <p className={`text-[13px] text-white ${SHADOW}`}>
+            <span className="num text-lg font-bold">{stats.cs}</span> CS {csDelta !== null && <Delta value={csDelta} />}
+            {stats.nextMilestone && (
+              <span className="text-white/60">
+                {' '}
+                · {stats.nextMilestone.minute}' : {stats.nextMilestone.expected}
+              </span>
+            )}
+          </p>
+        </Movable>
       )}
-      {ui.showBuild && stats.position && (
-        <div className="fixed top-1/2 right-6 w-[26rem] -translate-y-1/2 rounded-2xl border border-white/10 bg-night/85 p-5 shadow-2xl backdrop-blur-md">
-          <BuildSummary champion={stats.champion} position={stats.position} />
-        </div>
+      {m.vision && (
+        <Movable label="Vision" pos={pos.vision} editing={editing} onMove={move('vision')}>
+          <p className={`text-[13px] text-white ${SHADOW}`}>
+            <span className="num text-lg font-bold">{stats.vision}</span> vision{' '}
+            {visionDelta !== null && <Delta value={visionDelta * 10} digits={1} />}
+          </p>
+        </Movable>
+      )}
+      {m.gold && (
+        <Movable label="Or/min" pos={pos.gold} editing={editing} onMove={move('gold')}>
+          <p className={`text-[13px] text-white ${SHADOW}`}>
+            <span className="num text-lg font-bold">{Math.round(stats.goldPerMin)}</span> or/min
+          </p>
+        </Movable>
+      )}
+      {m.kp && (
+        <Movable label="KP" pos={pos.kp} editing={editing} onMove={move('kp')}>
+          <p className={`text-[13px] text-white ${SHADOW}`}>
+            <span className="num text-lg font-bold">{Math.round(stats.killParticipation * 100)}%</span> KP
+          </p>
+        </Movable>
+      )}
+
+      {settings.goldDiffOnTab && (ui.tabHeld || settings.scoreboard.calibrate || editing) && (
+        <ScoreboardGold
+          stats={stats}
+          layout={settings.scoreboard}
+          editing={editing}
+          onMove={(p) => save({ scoreboard: { ...settings.scoreboard, x: p.x, y: p.y } })}
+        />
+      )}
+
+      {(ui.showBuild || editing) && stats.position && (
+        <Movable label="Build" pos={pos.build} editing={editing} onMove={move('build')}>
+          <div className="w-[26rem] rounded-2xl border border-white/10 bg-night/85 p-5 shadow-2xl backdrop-blur-md">
+            <BuildSummary champion={stats.champion} position={stats.position} />
+          </div>
+        </Movable>
       )}
     </div>
   )
 }
 
+/** Barre du mode déplacement. */
+function EditBar({ settings, onReset }: { settings: OverlaySettings; onReset: () => void }) {
+  return (
+    <div className="fixed top-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-xl border border-accent/40 bg-night/95 px-4 py-2.5 text-sm shadow-2xl">
+      <span className="text-soft">Glisse chaque élément à sa place.</span>
+      <button className="rounded-lg px-3 py-1.5 text-mute hover:bg-white/5 hover:text-ink" onClick={onReset}>
+        Positions par défaut
+      </button>
+      <button className="rounded-lg bg-accent px-3 py-1.5 font-semibold text-night" onClick={() => void window.api.setOverlayEditing(false)}>
+        Terminer ({pretty(settings.editKey)})
+      </button>
+    </div>
+  )
+}
+
 /**
- * HUD minimal : quelques chiffres en texte ombré, sans cadre, pour ne pas gêner la lecture du jeu.
- * Couleur uniquement sur l'écart à la médiane de ton elo.
+ * Élément positionné en % de l'écran. En mode déplacement : contour pointillé, étiquette,
+ * glisser-déposer ; la position est enregistrée au relâchement.
  */
-function Hud({ stats: s, settings }: { stats: LiveStats; settings: OverlaySettings }) {
-  const m = settings.metrics
-  const csDelta = s.bench ? Math.round(s.cs - s.csExpected) : null
-  const visionDelta = s.bench ? s.visionPerMin - s.bench.visionPerMin : null
-  const lines = [
-    m.cs && (
-      <p key="cs">
-        <span className="num text-lg font-bold">{s.cs}</span> CS {csDelta !== null && <Delta value={csDelta} />}
-        {s.nextMilestone && <span className="text-white/60"> · {s.nextMilestone.minute}' : {s.nextMilestone.expected}</span>}
-      </p>
-    ),
-    m.vision && (
-      <p key="vision">
-        <span className="num text-lg font-bold">{s.vision}</span> vision{' '}
-        {visionDelta !== null && <Delta value={visionDelta * 10} digits={1} />}
-      </p>
-    ),
-    m.gold && (
-      <p key="gold">
-        <span className="num text-lg font-bold">{Math.round(s.goldPerMin)}</span> or/min
-      </p>
-    ),
-    m.kp && (
-      <p key="kp">
-        <span className="num text-lg font-bold">{Math.round(s.killParticipation * 100)}%</span> KP
-      </p>
-    )
-  ].filter(Boolean)
-  if (!lines.length) return null
+function Movable({
+  label,
+  pos,
+  editing,
+  onMove,
+  center,
+  children
+}: {
+  label: string
+  pos: WidgetPosition
+  editing: boolean
+  onMove: (p: WidgetPosition) => void
+  center?: boolean // la position désigne le centre de l'élément (tableau des scores)
+  children: ReactNode
+}) {
+  const [drag, setDrag] = useState<WidgetPosition | null>(null)
+  const p = drag ?? pos
+  const round = (v: number) => Math.round(Math.min(100, Math.max(0, v)) * 10) / 10
   return (
     <div
-      className={`fixed ${CORNER[settings.corner]} text-right text-[13px] leading-tight text-white [text-shadow:0_1px_2px_#000,0_0_6px_#000]`}
-      title={`Comparé à la médiane ${TIER_LABELS[s.tier]}`}
+      className={`absolute ${center ? '-translate-x-1/2' : ''} ${
+        editing ? 'cursor-move rounded-lg outline-2 outline-offset-4 outline-accent/70 outline-dashed' : ''
+      }`}
+      style={{ left: `${p.x}%`, top: `${p.y}%` }}
+      onPointerDown={(e) => {
+        if (!editing) return
+        e.currentTarget.setPointerCapture(e.pointerId)
+        const start = { mx: e.clientX, my: e.clientY, x: p.x, y: p.y }
+        const target = e.currentTarget
+        const onMoveEvt = (ev: PointerEvent) =>
+          setDrag({
+            x: round(start.x + ((ev.clientX - start.mx) / window.innerWidth) * 100),
+            y: round(start.y + ((ev.clientY - start.my) / window.innerHeight) * 100)
+          })
+        const onUp = (ev: PointerEvent) => {
+          target.removeEventListener('pointermove', onMoveEvt)
+          target.removeEventListener('pointerup', onUp)
+          const final = {
+            x: round(start.x + ((ev.clientX - start.mx) / window.innerWidth) * 100),
+            y: round(start.y + ((ev.clientY - start.my) / window.innerHeight) * 100)
+          }
+          setDrag(null)
+          onMove(final)
+        }
+        target.addEventListener('pointermove', onMoveEvt)
+        target.addEventListener('pointerup', onUp)
+      }}
     >
-      {lines}
+      {editing && (
+        <span className="absolute top-1/2 right-full mr-3 -translate-y-1/2 rounded bg-accent px-1.5 py-0.5 text-[11px] font-semibold whitespace-nowrap text-night">
+          {label}
+        </span>
+      )}
+      {children}
     </div>
   )
 }
@@ -112,14 +200,28 @@ function Delta({ value, digits = 0 }: { value: number; digits?: number }) {
  * Écarts d'or posés sur la ligne centrale du tableau des scores du jeu (Tab), une ligne par
  * lane : seulement le chiffre, dans la couleur du côté qui mène, une flèche vers le plus riche.
  */
-function ScoreboardGold({ stats: s, layout }: { stats: LiveStats; layout: OverlaySettings['scoreboard'] }) {
+function ScoreboardGold({
+  stats: s,
+  layout,
+  editing,
+  onMove
+}: {
+  stats: LiveStats
+  layout: OverlaySettings['scoreboard']
+  editing: boolean
+  onMove: (p: WidgetPosition) => void
+}) {
   const enemySide = s.side === 'blue' ? 'red' : 'blue'
   // Par défaut ton équipe est à gauche du tableau.
   const allyLeft = !layout.swapSides
-  const label = (diff: number, top: number, key: string, small?: boolean) => {
+  const px = (pct: number) => `${(pct / 100) * window.innerHeight}px`
+  // Zone du groupe : de la ligne « équipe » (au-dessus du top) jusqu'au support, centrée sur la ligne centrale.
+  const top = (row: number) => px((row + 1.5) * layout.spacing)
+  const label = (diff: number, row: number, key: string, small?: boolean) => {
+    const style = { top: top(row) }
     if (Math.abs(diff) < 100)
       return (
-        <span key={key} className="absolute -translate-x-1/2 -translate-y-1/2 text-white/50" style={{ left: `${layout.x}%`, top: `${top}%` }}>
+        <span key={key} className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 text-white/50" style={style}>
           =
         </span>
       )
@@ -130,20 +232,23 @@ function ScoreboardGold({ stats: s, layout }: { stats: LiveStats; layout: Overla
     return (
       <span
         key={key}
-        className={`num absolute -translate-x-1/2 -translate-y-1/2 font-bold whitespace-nowrap ${small ? 'text-sm' : 'text-base'} ${
+        className={`num absolute left-1/2 -translate-x-1/2 -translate-y-1/2 font-bold whitespace-nowrap ${small ? 'text-sm' : 'text-base'} ${
           side === 'blue' ? 'text-[#60a5fa]' : 'text-[#f87171]'
         }`}
-        style={{ left: `${layout.x}%`, top: `${top}%` }}
+        style={style}
       >
         {pointsLeft ? `‹ ${text}` : `${text} ›`}
       </span>
     )
   }
+  // Le groupe est ancré sur la 1re ligne (top) : la zone commence 1,5 ligne plus haut.
   return (
-    <div className="fixed inset-0 [text-shadow:0_1px_2px_#000,0_0_4px_#000]">
-      {label(s.teamGoldDiff, layout.y - layout.spacing, 'team', true)}
-      {s.lanes.map((l, i) => (l.ally && l.enemy ? label(l.diff, layout.y + i * layout.spacing, l.position) : null))}
-    </div>
+    <Movable label="Écarts d'or (Tab)" pos={{ x: layout.x, y: layout.y - 1.5 * layout.spacing }} editing={editing} onMove={(p) => onMove({ x: p.x, y: p.y + 1.5 * layout.spacing })} center>
+      <div className={`relative w-28 ${SHADOW}`} style={{ height: px(6.5 * layout.spacing) }}>
+        {label(s.teamGoldDiff, -1, 'team', true)}
+        {s.lanes.map((l, i) => (l.ally && l.enemy ? label(l.diff, i, l.position) : null))}
+      </div>
+    </Movable>
   )
 }
 

@@ -215,9 +215,16 @@ export const DEFAULT_SETTINGS: Settings = {
     metrics: { cs: true, vision: true, gold: false, kp: false },
     goldDiffOnTab: true,
     scoreboard: { x: 50, y: 38, spacing: 6.2, swapSides: false, calibrate: false },
-    corner: 'top-right',
+    positions: {
+      cs: { x: 86, y: 6 },
+      vision: { x: 86, y: 9 },
+      gold: { x: 86, y: 12 },
+      kp: { x: 86, y: 15 },
+      build: { x: 74, y: 30 }
+    },
     toggleKey: 'Control+Shift+H',
-    buildKey: 'Control+Shift+B'
+    buildKey: 'Control+Shift+B',
+    editKey: 'Control+Shift+M'
   }
 }
 
@@ -335,9 +342,26 @@ export interface OverlaySettings {
   metrics: Record<OverlayMetric, boolean>
   goldDiffOnTab: boolean // écart d'or par lane tant que Tab est maintenu
   scoreboard: ScoreboardLayout
-  corner: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+  /** Position de chaque élément de l'overlay (coin haut gauche, en % de l'écran), déplaçable. */
+  positions: Record<OverlayWidget, WidgetPosition>
   toggleKey: string // raccourci global (format Electron), ex. "Control+Shift+H"
   buildKey: string
+  editKey: string // active le déplacement des éléments
+}
+
+export type OverlayWidget = 'cs' | 'vision' | 'gold' | 'kp' | 'build'
+export interface WidgetPosition {
+  x: number
+  y: number
+}
+
+/** Colonne en haut à droite, sous le score du jeu ; le build au milieu à droite. */
+export const DEFAULT_POSITIONS: Record<OverlayWidget, WidgetPosition> = {
+  cs: { x: 86, y: 6 },
+  vision: { x: 86, y: 9 },
+  gold: { x: 86, y: 12 },
+  kp: { x: 86, y: 15 },
+  build: { x: 74, y: 30 }
 }
 
 /**
@@ -362,9 +386,10 @@ export const DEFAULT_OVERLAY: OverlaySettings = {
   metrics: { cs: true, vision: true, gold: false, kp: false },
   goldDiffOnTab: true,
   scoreboard: DEFAULT_SCOREBOARD,
-  corner: 'top-right',
+  positions: DEFAULT_POSITIONS,
   toggleKey: 'Control+Shift+H',
-  buildKey: 'Control+Shift+B'
+  buildKey: 'Control+Shift+B',
+  editKey: 'Control+Shift+M'
 }
 
 /** Écart d'or estimé (valeur des items) entre les deux joueurs d'une lane, vu de ton équipe. */
@@ -407,6 +432,7 @@ export interface OverlayUi {
   visible: boolean
   showBuild: boolean
   tabHeld: boolean
+  editing: boolean // mode déplacement : l'overlay reçoit la souris
 }
 
 export interface DisplayInfo {

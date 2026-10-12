@@ -60,7 +60,9 @@ export interface Api {
   getMatchupBuild(champion: string, position: Position, opponent: string): Promise<MatchupBuild>
   getProBuilds(champion: string, position: Position, opponent: string | null): Promise<ProBuilds>
   importBuildData(build: ChampionBuild, parts: { runes?: boolean; spells?: boolean; items?: boolean }): Promise<ImportResult>
+  setOverlayEditing(on: boolean): Promise<void>
   getOverlayState(): Promise<{ stats: LiveStats | null; ui: OverlayUi; settings: OverlaySettings }>
+  isInGame(): Promise<boolean>
   getDisplays(): Promise<DisplayInfo[]>
   launchRiotClient(): Promise<void>
   signOut(): Promise<void>

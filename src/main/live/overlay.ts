@@ -41,7 +41,7 @@ function fetchLive(path: string): Promise<any> {
 export class OverlayManager {
   private win: BrowserWindow | null = null
   private timer: NodeJS.Timeout | null = null
-  private ui: OverlayUi = { visible: true, showBuild: false, tabHeld: false }
+  private ui: OverlayUi = { visible: true, showBuild: false, tabHeld: false, editing: false }
   private tabTimer: NodeJS.Timeout | null = null
   /** CS au passage de chaque repère (10/15/20 min) de la partie en cours. */
   private milestones = new Map<number, { cs: number; expected: number }>()
@@ -83,6 +83,10 @@ export class OverlayManager {
     return this.ui
   }
 
+  inGame(): boolean {
+    return !!this.stats
+  }
+
   private mode: OverlaySettings['mode'] | null = null
   private displayId: number | null = null
 
@@ -107,9 +111,29 @@ export class OverlayManager {
     if (s.enabled) {
       bind(s.toggleKey, () => this.setUi({ visible: !this.ui.visible }))
       bind(s.buildKey, () => this.setUi({ showBuild: !this.ui.showBuild, visible: true }))
+      bind(s.editKey, () => this.setEditing(!this.ui.editing))
     } else this.hide()
     this.win?.webContents.send('overlay:settings', s)
     return errors
+  }
+
+  /**
+   * Mode déplacement : l'overlay reçoit la souris le temps de glisser les éléments, puis
+   * redevient transparent aux clics et non focusable. Uniquement pendant une partie.
+   */
+  setEditing(on: boolean): void {
+    if (on && !this.stats) return // l'overlay n'existe qu'en partie
+    if (on && this.getSettings().mode === 'overlay') {
+      this.ensureWindow()
+      const w = this.win!
+      w.setIgnoreMouseEvents(false)
+      w.setFocusable(true)
+      w.focus()
+    } else if (this.win && this.mode === 'overlay') {
+      this.win.setIgnoreMouseEvents(true)
+      this.win.setFocusable(false)
+    }
+    this.setUi({ editing: on && this.getSettings().mode === 'overlay', visible: true })
   }
 
   /** Utilisé par le mode capture (pas de touche à presser). */
@@ -212,6 +236,6 @@ export class OverlayManager {
     const w = this.win
     this.win = null // avant destroy : ce n'est pas une fermeture par l'utilisateur
     w?.destroy()
-    this.ui = { visible: true, showBuild: false, tabHeld: false }
+    this.ui = { visible: true, showBuild: false, tabHeld: false, editing: false }
   }
 }

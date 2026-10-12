@@ -19,6 +19,8 @@ const methods: ApiMethod[] = [
   'getBuild',
   'importBuild',
   'getOverlayState',
+  'setOverlayEditing',
+  'isInGame',
   'getMatchupBuild',
   'getProBuilds',
   'importBuildData',

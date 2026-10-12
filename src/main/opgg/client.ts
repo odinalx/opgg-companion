@@ -1,5 +1,7 @@
 // Client de l'OP.GG MCP (https://mcp-api.op.gg/mcp, Streamable HTTP, sans auth).
 // Chaque méthode renvoie des données déjà normalisées et passe par le cache disque.
+// Les statistiques de champions (méta, matchups, synergies, builds) sont celles du filtre par
+// défaut d'OP.GG : parties classées Émeraude+ du patch en cours (vérifié par les volumes de games).
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'

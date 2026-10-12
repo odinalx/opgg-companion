@@ -11,9 +11,9 @@ import { positionLabel } from '../lib/format'
 const CRITERION_LABELS: Record<CriterionKey, { name: string; help: string }> = {
   personal: { name: 'Winrate perso', help: 'Ton winrate sur le champion, lissé quand tu as peu de games.' },
   mastery: { name: 'Mastery', help: 'Tes points de maîtrise (client LoL requis).' },
-  meta: { name: 'Méta', help: 'Winrate et tier du champion sur ton rôle, tous joueurs confondus.' },
-  matchup: { name: 'Matchup', help: 'Winrate contre ton adversaire de lane, quand il est connu.' },
-  synergy: { name: 'Synergie', help: 'Winrate en duo avec les champions de tes alliés.' }
+  meta: { name: 'Méta', help: 'Winrate et tier du champion sur ton rôle (OP.GG, classée Émeraude+).' },
+  matchup: { name: 'Matchup', help: 'Winrate contre ton adversaire de lane (OP.GG, Émeraude+), quand il est connu.' },
+  synergy: { name: 'Synergie', help: 'Winrate en duo avec les champions de tes alliés (OP.GG, Émeraude+).' }
 }
 
 const QUEUE_LABELS: Record<DraftQueue, { name: string; help: string }> = {

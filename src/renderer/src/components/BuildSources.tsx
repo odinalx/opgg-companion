@@ -94,7 +94,7 @@ export function MatchupTab({
   return (
     <div className="flex flex-col gap-6">
       <p className="text-sm text-soft">
-        Ce que jouent les joueurs de {champion} contre {opponent} (OP.GG, classée). Runes, sorts et items sont comptés
+        Ce que jouent les joueurs de {champion} contre {opponent} (OP.GG, classée Émeraude+, patch actuel). Runes, sorts et items sont comptés
         séparément : pour des builds joués ensemble, regarde l'onglet High elo.
       </p>
 

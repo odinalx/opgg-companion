@@ -123,8 +123,8 @@ function MatchRow({ match: m, open, onToggle }: { match: MatchSummary; open: boo
   const mins = m.durationSec / 60 || 1
   const tone = m.remake ? 'mute' : m.win ? 'win' : 'loss'
   const tint = {
-    win: 'bg-gradient-to-r from-win/[0.14] to-panel/60 border-win/30 shadow-[inset_3px_0_0_var(--color-win)]',
-    loss: 'bg-gradient-to-r from-loss/[0.12] to-panel/60 border-loss/25 shadow-[inset_3px_0_0_var(--color-loss)]',
+    win: 'bg-gradient-to-r from-win/[0.12] to-panel/60 border-win/25',
+    loss: 'bg-gradient-to-r from-loss/[0.10] to-panel/60 border-loss/20',
     mute: 'bg-panel border-line'
   }[tone]
   const text = { win: 'text-win', loss: 'text-loss', mute: 'text-mute' }[tone]
