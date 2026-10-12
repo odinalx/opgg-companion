@@ -192,9 +192,27 @@ if (process.env.MOCK_INGAME) {
       ],
       scores: { creepScore: Math.round(min * 7.1), kills: 4, deaths: 2, assists: 5, wardScore: min * 0.9 }
     }
+    // Les 9 autres joueurs : la valeur de leurs items progresse avec le temps (écart d'or par lane).
+    const keyOf = (name) => Object.values(champs.data).find((c) => c.name === name)?.id ?? name
+    const player = (riotId, team, position, name, goldRate, kills) => ({
+      riotId,
+      team,
+      position,
+      championName: name,
+      rawChampionName: `game_character_displayname_${keyOf(name)}`,
+      items: [{ itemID: 1001, price: Math.round(goldRate * min), count: 1 }],
+      scores: { kills, deaths: 2, assists: 3, creepScore: 0, wardScore: 0 }
+    })
     const others = [
-      { riotId: 'Allié#1', team: 'ORDER', scores: { kills: 9 } },
-      { riotId: 'Ennemi#1', team: 'CHAOS', scores: { kills: 11 } }
+      player('Allié#1', 'ORDER', 'JUNGLE', 'Lee Sin', 330, 3),
+      player('Allié#2', 'ORDER', 'MIDDLE', 'Ahri', 360, 4),
+      player('Allié#3', 'ORDER', 'BOTTOM', 'Jinx', 345, 2),
+      player('Allié#4', 'ORDER', 'UTILITY', 'Thresh', 200, 0),
+      player('Ennemi#1', 'CHAOS', 'TOP', 'Darius', 330, 3),
+      player('Ennemi#2', 'CHAOS', 'JUNGLE', 'Vi', 300, 2),
+      player('Ennemi#3', 'CHAOS', 'MIDDLE', 'Zed', 395, 5),
+      player('Ennemi#4', 'CHAOS', 'BOTTOM', 'Caitlyn', 340, 1),
+      player('Ennemi#5', 'CHAOS', 'UTILITY', 'Lux', 215, 1)
     ]
     res.writeHead(200, { 'Content-Type': 'application/json' }).end(
       JSON.stringify({

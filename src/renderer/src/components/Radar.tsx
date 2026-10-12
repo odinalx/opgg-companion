@@ -114,7 +114,7 @@ export function SkillRadar({ axes }: { axes: SkillAxis[] }) {
             <span className="h-0.5 w-5 rounded bg-soft" /> Toutes les games
           </li>
           <li className="flex items-center gap-2 text-mute">
-            <span className="w-5 border-t border-dashed border-mute" /> Repère du rôle (50)
+            <span className="w-5 border-t border-dashed border-mute" /> Médiane de ton palier (50)
           </li>
         </ul>
         <table className="w-full text-sm">
@@ -149,9 +149,7 @@ export function SkillRadar({ axes }: { axes: SkillAxis[] }) {
             ))}
           </tbody>
         </table>
-        <p className="mt-3 text-xs text-mute">
-          50 = niveau courant pour ton rôle en classée, 90 = très bon. Chaque game est comparée aux repères de son rôle.
-        </p>
+        <p className="mt-3 text-xs text-mute">Chaque game est comparée aux médianes de son rôle, puis les notes sont moyennées.</p>
       </div>
     </div>
   )

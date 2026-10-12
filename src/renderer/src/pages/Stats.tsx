@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import type { StatsAggregate } from '@shared/types'
+import type { StatsAggregate, Tier } from '@shared/types'
+import { TIER_LABELS, TIERS } from '@shared/types'
 import { useApp } from '../store'
 import { ChampIcon } from '../components/Icons'
 import { SkillRadar } from '../components/Radar'
@@ -10,17 +11,35 @@ import { pct, positionLabel, wrColor } from '../lib/format'
 export function StatsPage() {
   const account = useApp((s) => s.account)!
   const queueFilter = useApp((s) => s.settings?.queueFilter)
+  const compareTier = useApp((s) => s.settings?.compareTier ?? 'auto')
   const updateSettings = useApp((s) => s.updateSettings)
   const [stats, setStats] = useState<StatsAggregate | null>(null)
 
   useEffect(() => {
     setStats(null)
     window.api.getStats(account).then(setStats, () => setStats(null))
-  }, [account, queueFilter])
+  }, [account, queueFilter, compareTier])
+  const b = stats?.tierBench ?? undefined
 
   return (
     <>
-      <PageHeader title="Stats" subtitle="Calculées sur tout l'historique enregistré.">
+      <PageHeader
+        title="Stats"
+        subtitle={stats ? `Calculées sur tout l'historique enregistré, comparées aux médianes ${TIER_LABELS[stats.tier]} de tes rôles.` : undefined}
+      >
+        <select
+          aria-label="Palier de comparaison"
+          value={compareTier}
+          onChange={(e) => void updateSettings({ compareTier: e.target.value as Tier | 'auto' })}
+          className="field px-3 py-2 text-sm"
+        >
+          <option value="auto">Comparer à mon elo</option>
+          {TIERS.map((t) => (
+            <option key={t} value={t}>
+              Comparer à {TIER_LABELS[t]}
+            </option>
+          ))}
+        </select>
         <select
           aria-label="Games prises en compte"
           value={queueFilter}
@@ -39,19 +58,22 @@ export function StatsPage() {
         </Empty>
       ) : (
         <div className="flex flex-col gap-6">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
             <Tile label="Games" value={String(stats.games)} />
             <Tile label="Winrate" value={pct(stats.wins / stats.games)} tone={wrColor(stats.wins / stats.games)} />
-            <Tile label="KDA moyen" value={stats.kda.toFixed(2)} />
-            <Tile label="CS par minute" value={stats.csPerMin.toFixed(1)} />
-            <Tile label="Dégâts par minute" value={Math.round(stats.damagePerMin).toLocaleString('fr-FR')} />
-            <Tile label="Wards par game" value={stats.visionPerGame.toFixed(1)} />
+            <Tile label="KDA" value={stats.kda.toFixed(2)} you={stats.kda} median={b?.kda} />
+            <Tile label="CS par minute" value={stats.csPerMin.toFixed(1)} you={stats.csPerMin} median={b?.csPerMin} />
+            <Tile label="Dégâts par minute" value={Math.round(stats.damagePerMin).toLocaleString('fr-FR')} you={stats.damagePerMin} median={b?.damagePerMin} digits={0} />
+            <Tile label="Or par minute" value={Math.round(stats.goldPerMin).toLocaleString('fr-FR')} you={stats.goldPerMin} median={b?.goldPerMin} digits={0} />
+            <Tile label="Wards par minute" value={stats.wardsPerMin.toFixed(2)} you={stats.wardsPerMin} median={b?.wardsPerMin} digits={2} />
           </div>
 
           {stats.skills.length > 0 && (
             <section className="card p-6">
               <h2 className="font-display text-2xl font-bold">Profil de jeu</h2>
-              <p className="mb-4 text-sm text-mute">Tes points forts par domaine, comparés aux repères de chaque rôle.</p>
+              <p className="mb-4 text-sm text-mute">
+                50 = médiane {TIER_LABELS[stats.tier]} de ton rôle, 90 = médiane deux paliers au-dessus.
+              </p>
               <SkillRadar axes={stats.skills} />
             </section>
           )}
@@ -144,11 +166,34 @@ export function StatsPage() {
   )
 }
 
-function Tile({ label, value, tone = '' }: { label: string; value: string; tone?: string }) {
+function Tile({
+  label,
+  value,
+  tone = '',
+  you,
+  median,
+  digits = 1,
+  lowerIsBetter
+}: {
+  label: string
+  value: string
+  tone?: string
+  you?: number
+  median?: number
+  digits?: number
+  lowerIsBetter?: boolean
+}) {
+  const better = you !== undefined && median !== undefined ? (lowerIsBetter ? you <= median : you >= median) : null
   return (
     <div className="card px-5 py-4">
       <p className="text-sm text-mute">{label}</p>
       <p className={`num mt-1 text-4xl leading-none font-bold ${tone}`}>{value}</p>
+      {median !== undefined && (
+        <p className="mt-1.5 text-xs text-mute">
+          médiane <span className="num text-sm text-soft">{median.toFixed(digits)}</span>{' '}
+          <span className={better ? 'text-ok' : 'text-loss'}>{better ? '▲' : '▼'}</span>
+        </p>
+      )}
     </div>
   )
 }

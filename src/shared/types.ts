@@ -186,6 +186,8 @@ export interface Settings {
   candidatePool: 'owned' | 'played' | 'all'
   /** Importe runes + sorts dans le client dès que le champion est locké. */
   autoImport: boolean
+  /** Palier de comparaison des stats et de l'overlay ; 'auto' = rang solo du compte. */
+  compareTier: Tier | 'auto'
   overlay: OverlaySettings
 }
 
@@ -205,11 +207,13 @@ export const DEFAULT_SETTINGS: Settings = {
   queueFilter: 'ranked',
   candidatePool: 'played',
   autoImport: false,
+  compareTier: 'auto',
   overlay: {
     enabled: true,
     mode: 'overlay',
     displayId: null,
-    metrics: { cs: true, gold: true, kda: true, kp: true, vision: false },
+    metrics: { cs: true, vision: true, gold: false, kp: false },
+    goldDiffOnTab: true,
     corner: 'top-right',
     toggleKey: 'Control+Shift+H',
     buildKey: 'Control+Shift+B'
@@ -223,10 +227,16 @@ export interface StatsAggregate {
   csPerMin: number
   damagePerMin: number
   visionPerGame: number
+  wardsPerMin: number
+  goldPerMin: number
+  deathsPer10: number
   byChampion: Array<{ champion: string; games: number; wins: number; kda: number; csPerMin: number }>
   byPosition: Array<{ position: Position; games: number; wins: number }>
   trend: Array<{ date: string; win: boolean; kda: number; opScore: number | null; cumulativeWr: number }>
   skills: SkillAxis[]
+  tier: Tier // palier de comparaison
+  /** Médianes du palier, pondérées par tes rôles joués (pour comparer les tuiles). */
+  tierBench: TierBenchmark | null
 }
 
 export type SkillKey = 'combat' | 'farm' | 'damage' | 'vision' | 'survival' | 'economy'
@@ -286,8 +296,35 @@ export interface ImportResult {
 
 // ---------- Overlay en jeu ----------
 
-export type OverlayMetric = 'cs' | 'gold' | 'kda' | 'kp' | 'vision'
-export const OVERLAY_METRICS: OverlayMetric[] = ['cs', 'gold', 'kda', 'kp', 'vision']
+export type OverlayMetric = 'cs' | 'vision' | 'gold' | 'kp'
+export const OVERLAY_METRICS: OverlayMetric[] = ['cs', 'vision', 'gold', 'kp']
+
+/** Paliers utilisés pour les comparaisons (Master regroupe Master, Grandmaster et Challenger). */
+export const TIERS = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER'] as const
+export type Tier = (typeof TIERS)[number]
+export const TIER_LABELS: Record<Tier, string> = {
+  IRON: 'Fer',
+  BRONZE: 'Bronze',
+  SILVER: 'Argent',
+  GOLD: 'Or',
+  PLATINUM: 'Platine',
+  EMERALD: 'Émeraude',
+  DIAMOND: 'Diamant',
+  MASTER: 'Master+'
+}
+
+/** Médianes d'un rôle dans un palier. */
+export interface TierBenchmark {
+  samples: number
+  csPerMin: number
+  goldPerMin: number
+  damagePerMin: number
+  wardsPerMin: number
+  deathsPer10: number
+  kda: number
+  killParticipation: number
+  visionPerMin: number // estimation (le score de vision n'est pas dans les données OP.GG)
+}
 
 export interface OverlaySettings {
   enabled: boolean
@@ -295,6 +332,7 @@ export interface OverlaySettings {
   mode: 'overlay' | 'window'
   displayId: number | null // écran de la fenêtre (null = écran principal)
   metrics: Record<OverlayMetric, boolean>
+  goldDiffOnTab: boolean // écart d'or par lane tant que Tab est maintenu
   corner: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
   toggleKey: string // raccourci global (format Electron), ex. "Control+Shift+H"
   buildKey: string
@@ -304,10 +342,20 @@ export const DEFAULT_OVERLAY: OverlaySettings = {
   enabled: true,
   mode: 'overlay',
   displayId: null,
-  metrics: { cs: true, gold: true, kda: true, kp: true, vision: false },
+  metrics: { cs: true, vision: true, gold: false, kp: false },
+  goldDiffOnTab: true,
   corner: 'top-right',
   toggleKey: 'Control+Shift+H',
   buildKey: 'Control+Shift+B'
+}
+
+/** Écart d'or estimé (valeur des items) entre les deux joueurs d'une lane, vu de ton équipe. */
+export interface LaneGold {
+  position: Position
+  ally: string | null
+  enemy: string | null
+  diff: number // > 0 : ton côté mène
+  mine: boolean
 }
 
 /** Stats du joueur pendant la partie (Live Client Data API). */
@@ -318,7 +366,15 @@ export interface LiveStats {
   level: number
   cs: number
   csPerMin: number
-  csTarget: number // repère « bon niveau » pour le rôle
+  tier: Tier // palier de comparaison
+  bench: TierBenchmark | null // médianes du palier pour ce rôle
+  csExpected: number // CS attendus à cette minute pour le palier
+  nextMilestone: { minute: number; expected: number } | null
+  milestones: Array<{ minute: number; cs: number; expected: number }> // repères 10/15/20 déjà passés
+  visionPerMin: number
+  lanes: LaneGold[]
+  side: 'blue' | 'red' // côté de ton équipe
+  teamGoldDiff: number // or estimé de ton équipe moins celui de l'adversaire
   kills: number
   deaths: number
   assists: number
@@ -332,6 +388,7 @@ export interface LiveStats {
 export interface OverlayUi {
   visible: boolean
   showBuild: boolean
+  tabHeld: boolean
 }
 
 export interface DisplayInfo {
@@ -340,4 +397,55 @@ export interface DisplayInfo {
   primary: boolean
   width: number
   height: number
+}
+
+export type RunePage = NonNullable<ChampionBuild['runes']>
+
+/** Statistiques OP.GG du champion dans un matchup précis (agrégées séparément par catégorie). */
+export interface MatchupBuild {
+  champion: string
+  opponent: string
+  position: Position
+  runePages: RunePage[] // 2 pages les plus jouées
+  spells: BuildOption[]
+  starter: BuildOption | null
+  boots: BuildOption[]
+  cores: BuildOption[]
+  skillOrder: string[]
+}
+
+/** Une game réelle d'un joueur high elo, telle qu'elle a été jouée. */
+export interface ProGame {
+  player: string
+  tier: string | null
+  region: string
+  createdAt: string
+  win: boolean
+  kills: number
+  deaths: number
+  assists: number
+  opponent: string | null
+}
+
+/** Ensemble cohérent runes + sorts + items, regroupé à partir de vraies games. */
+export interface BuildVariant {
+  games: number
+  wins: number
+  vsOpponent: number
+  keystone: number
+  subStyle: number
+  runes: RunePage | null // page complète la plus jouée avec cette keystone et cet arbre secondaire
+  spells: number[]
+  items: number[] // items terminés les plus fréquents dans ces games, dans l'ordre de fréquence
+  boots: number | null
+  examples: ProGame[]
+}
+
+export interface ProBuilds {
+  champion: string
+  position: Position
+  opponent: string | null
+  gamesAnalyzed: number
+  players: number
+  variants: BuildVariant[]
 }

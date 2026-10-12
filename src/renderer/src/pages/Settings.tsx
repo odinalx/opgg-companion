@@ -217,11 +217,10 @@ function ModelSection({ useModel, onToggle }: { useModel: boolean; onToggle: (v:
 }
 
 const METRIC_LABELS: Record<OverlayMetric, string> = {
-  cs: 'CS et CS/min (comparé au repère de ton rôle)',
+  cs: 'CS et repères à 10, 15 et 20 min (médiane de ton elo)',
+  vision: 'Score de vision par minute (comparé à ton elo)',
   gold: 'Or estimé par minute',
-  kda: 'KDA',
-  kp: 'Participation aux kills',
-  vision: 'Score de vision'
+  kp: 'Participation aux kills'
 }
 
 const CORNERS: Array<{ value: OverlaySettings['corner']; label: string }> = [
@@ -269,6 +268,15 @@ function OverlaySection() {
               {METRIC_LABELS[m]}
             </label>
           ))}
+          <label className="flex items-center gap-2 py-0.5 text-sm">
+            <input
+              type="checkbox"
+              checked={o.goldDiffOnTab}
+              onChange={(e) => set({ goldDiffOnTab: e.target.checked })}
+              className="h-4 w-4 accent-[var(--color-accent)]"
+            />
+            Écart d'or par lane en maintenant Tab
+          </label>
         </div>
         <div className="flex flex-col gap-3">
           <label className="text-sm">

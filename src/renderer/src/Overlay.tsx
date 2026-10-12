@@ -1,7 +1,9 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import type { ChampionBuild, LiveStats, OverlaySettings, OverlayUi } from '@shared/types'
+import { TIER_LABELS } from '@shared/types'
 import { useApp } from './store'
 import { ChampIcon, ItemIcon, RuneIcon } from './components/Icons'
+import { positionLabel } from './lib/format'
 
 const CORNER: Record<OverlaySettings['corner'], string> = {
   // Décalages choisis pour ne pas couvrir le score (haut droite) ni la minimap (bas droite).
@@ -15,7 +17,7 @@ const pretty = (key: string): string => key.replace('Control', 'Ctrl').replaceAl
 
 export function Overlay() {
   const [stats, setStats] = useState<LiveStats | null>(null)
-  const [ui, setUi] = useState<OverlayUi>({ visible: true, showBuild: false })
+  const [ui, setUi] = useState<OverlayUi>({ visible: true, showBuild: false, tabHeld: false })
   const [settings, setSettings] = useState<OverlaySettings | null>(null)
 
   useEffect(() => {
@@ -41,6 +43,7 @@ export function Overlay() {
   return (
     <div className="pointer-events-none fixed inset-0 select-none">
       <Hud stats={stats} settings={settings} />
+      {ui.tabHeld && settings.goldDiffOnTab && <GoldDiff stats={stats} />}
       {ui.showBuild && stats.position && (
         <div className="fixed top-1/2 right-6 w-[26rem] -translate-y-1/2 rounded-2xl border border-white/10 bg-night/85 p-5 shadow-2xl backdrop-blur-md">
           <BuildSummary champion={stats.champion} position={stats.position} />
@@ -52,42 +55,116 @@ export function Overlay() {
 
 function Hud({ stats: s, settings }: { stats: LiveStats; settings: OverlaySettings }) {
   const m = settings.metrics
-  const csRatio = s.csPerMin / s.csTarget
-  const csTone = csRatio >= 0.9 ? 'text-ok' : csRatio >= 0.7 ? 'text-[#e3b341]' : 'text-loss'
+  const tier = TIER_LABELS[s.tier]
+  const csDelta = s.bench ? Math.round(s.cs - s.csExpected) : null
+  const visionDelta = s.bench ? s.visionPerMin - s.bench.visionPerMin : null
   return (
-    <div className={`fixed ${CORNER[settings.corner]} flex items-center gap-3 rounded-2xl border border-white/10 bg-night/80 py-2 pr-4 pl-2 shadow-2xl backdrop-blur-md`}>
-      <ChampIcon name={s.champion} size={40} className="rounded-xl" />
+    <div className={`fixed ${CORNER[settings.corner]} w-[19rem] rounded-2xl border border-white/10 bg-night/80 p-3 shadow-2xl backdrop-blur-md`}>
+      <div className="flex items-center gap-2.5">
+        <ChampIcon name={s.champion} size={34} className="rounded-lg" />
+        <p className="text-xs text-mute">
+          Comparé à la médiane <span className="font-semibold text-soft">{tier}</span>
+          {s.position ? ` · ${positionLabel(s.position)}` : ''}
+        </p>
+      </div>
+
       {m.cs && (
-        <Metric label={`CS · objectif ${s.csTarget.toFixed(1)}`}>
-          {s.cs} <span className={csTone}>{s.csPerMin.toFixed(1)}/min</span>
-        </Metric>
+        <div className="mt-3">
+          <div className="flex items-baseline gap-2">
+            <p className="num text-3xl leading-none font-bold">{s.cs}</p>
+            <p className="text-sm text-soft">CS · {s.csPerMin.toFixed(1)}/min</p>
+            {csDelta !== null && <Delta value={csDelta} suffix=" CS" />}
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px]">
+            {s.milestones.map((ms) => (
+              <span key={ms.minute} className={`rounded-md px-1.5 py-0.5 ${ms.cs >= ms.expected ? 'bg-ok/15 text-ok' : 'bg-loss/15 text-loss'}`}>
+                {ms.minute}' : {ms.cs}/{ms.expected}
+              </span>
+            ))}
+            {s.nextMilestone && (
+              <span className="rounded-md bg-white/5 px-1.5 py-0.5 text-soft">
+                objectif {s.nextMilestone.minute}' : {s.nextMilestone.expected} CS
+              </span>
+            )}
+          </div>
+        </div>
       )}
-      {m.kda && (
-        <Metric label="KDA">
-          {s.kills}/<span className="text-loss">{s.deaths}</span>/{s.assists}
-        </Metric>
+
+      {m.vision && (
+        <div className="mt-3 flex items-baseline gap-2">
+          <p className="num text-2xl leading-none font-bold">{s.vision}</p>
+          <p className="text-sm text-soft">vision · {s.visionPerMin.toFixed(2)}/min</p>
+          {visionDelta !== null && <Delta value={visionDelta} digits={2} suffix="/min" />}
+        </div>
       )}
-      {m.kp && <Metric label="Participation">{Math.round(s.killParticipation * 100)}%</Metric>}
-      {m.gold && (
-        <Metric label="Or estimé /min">
-          {Math.round(s.goldPerMin)} <span className="text-mute">· {(s.goldEarned / 1000).toFixed(1)}k</span>
-        </Metric>
+
+      {(m.gold || m.kp) && (
+        <div className="mt-3 flex gap-4 text-sm">
+          {m.gold && (
+            <p>
+              <span className="num text-lg font-bold">{Math.round(s.goldPerMin)}</span> <span className="text-soft">or/min</span>
+            </p>
+          )}
+          {m.kp && (
+            <p>
+              <span className="num text-lg font-bold">{Math.round(s.killParticipation * 100)}%</span>{' '}
+              <span className="text-soft">participation</span>
+            </p>
+          )}
+        </div>
       )}
-      {m.vision && <Metric label="Vision">{s.vision}</Metric>}
-      <p className="ml-1 border-l border-white/10 pl-3 text-[11px] leading-tight text-mute">
-        Build
-        <br />
-        {pretty(settings.buildKey)}
+
+      <p className="mt-3 border-t border-white/10 pt-2 text-[11px] text-mute">
+        {settings.goldDiffOnTab ? 'Tab : écart d\'or par lane · ' : ''}
+        {pretty(settings.buildKey)} : build
       </p>
     </div>
   )
 }
 
-function Metric({ label, children }: { label: string; children: ReactNode }) {
+function Delta({ value, digits = 0, suffix = '' }: { value: number; digits?: number; suffix?: string }) {
+  const up = value >= 0
   return (
-    <div className="leading-tight">
-      <p className="num text-xl font-bold whitespace-nowrap text-ink">{children}</p>
-      <p className="text-[11px] whitespace-nowrap text-mute">{label}</p>
+    <span className={`num ml-auto text-base font-semibold ${up ? 'text-ok' : 'text-loss'}`}>
+      {up ? '+' : '−'}
+      {Math.abs(value).toFixed(digits)}
+      {suffix}
+    </span>
+  )
+}
+
+/** Écart d'or par lane (valeur des items), dans la couleur du côté qui mène — à la manière des overlays du marché. */
+function GoldDiff({ stats: s, embedded }: { stats: LiveStats; embedded?: boolean }) {
+  const enemySide = s.side === 'blue' ? 'red' : 'blue'
+  const color = (side: 'blue' | 'red') => (side === 'blue' ? 'text-win' : 'text-loss')
+  const row = (diff: number) => {
+    if (Math.abs(diff) < 100) return <span className="num text-lg text-mute">=</span>
+    const side = diff > 0 ? s.side : enemySide
+    return <span className={`num text-lg font-bold ${color(side)}`}>{Math.abs(diff).toLocaleString('fr-FR')}</span>
+  }
+  return (
+    <div
+      className={
+        embedded
+          ? 'card px-4 py-3'
+          : 'fixed top-24 left-1/2 w-[22rem] -translate-x-1/2 rounded-2xl border border-white/10 bg-night/85 px-4 py-3 shadow-2xl backdrop-blur-md'
+      }
+    >
+      <p className="mb-2 text-center text-xs text-mute">Écart d'or estimé (valeur des items)</p>
+      <ul className="flex flex-col gap-1">
+        {s.lanes.map((l) => (
+          <li key={l.position} className={`grid grid-cols-[2rem_1fr_4.5rem_1fr_2rem] items-center gap-2 rounded-lg px-1 py-0.5 ${l.mine ? 'bg-white/5' : ''}`}>
+            <ChampIcon name={l.ally} size={28} className={`rounded-md ring-2 ${s.side === 'blue' ? 'ring-win/70' : 'ring-loss/70'}`} />
+            <span className="text-xs text-soft">{positionLabel(l.position)}</span>
+            <span className="text-center">{row(l.diff)}</span>
+            <span />
+            <ChampIcon name={l.enemy} size={28} className={`rounded-md ring-2 ${s.side === 'blue' ? 'ring-loss/70' : 'ring-win/70'}`} />
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 border-t border-white/10 pt-1.5 text-center text-sm">
+        Équipe <span className="ml-1">{row(s.teamGoldDiff)}</span>
+      </p>
     </div>
   )
 }
@@ -176,7 +253,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-/** Mode « second écran » : fenêtre classique avec les stats en grand et le build toujours visible. */
+/** Mode « second écran » : fenêtre classique, tout est visible en permanence (stats, écart d'or, build). */
 function LiveWindow({ stats: s, settings }: { stats: LiveStats | null; settings: OverlaySettings }) {
   if (!s)
     return (
@@ -187,37 +264,48 @@ function LiveWindow({ stats: s, settings }: { stats: LiveStats | null; settings:
         </div>
       </div>
     )
-  const csRatio = s.csPerMin / s.csTarget
-  const csTone = csRatio >= 0.9 ? 'text-ok' : csRatio >= 0.7 ? 'text-[#e3b341]' : 'text-loss'
   const m = settings.metrics
   const clock = `${Math.floor(s.gameTime / 60)}:${String(Math.floor(s.gameTime % 60)).padStart(2, '0')}`
+  const csDelta = s.bench ? Math.round(s.cs - s.csExpected) : null
   return (
-    <div className="flex h-full flex-col gap-5 overflow-y-auto p-6">
+    <div className="flex h-full flex-col gap-4 overflow-y-auto p-5">
       <div className="flex items-baseline justify-between">
         <p className="font-display text-xl font-bold text-accent">En jeu</p>
-        <p className="num text-2xl text-soft">{clock} · niv. {s.level}</p>
+        <p className="text-sm text-mute">comparé à la médiane {TIER_LABELS[s.tier]}</p>
+        <p className="num text-2xl text-soft">{clock}</p>
       </div>
       <div className="grid grid-cols-2 gap-3">
         {m.cs && (
-          <Tile label={`CS/min · objectif ${s.csTarget.toFixed(1)}`}>
-            <span className={csTone}>{s.csPerMin.toFixed(1)}</span>
-            <span className="text-lg text-mute"> ({s.cs})</span>
+          <Tile label={`CS · ${s.csPerMin.toFixed(1)}/min (médiane ${s.bench?.csPerMin.toFixed(1) ?? '—'})`}>
+            {s.cs}
+            {csDelta !== null && <Delta value={csDelta} />}
           </Tile>
         )}
-        {m.kda && (
-          <Tile label="KDA">
-            {s.kills}/<span className="text-loss">{s.deaths}</span>/{s.assists}
+        {m.vision && (
+          <Tile label={`Vision · ${s.visionPerMin.toFixed(2)}/min (médiane ${s.bench?.visionPerMin.toFixed(2) ?? '—'})`}>
+            {s.vision}
           </Tile>
         )}
+        {m.gold && <Tile label="Or estimé par minute">{Math.round(s.goldPerMin)}</Tile>}
         {m.kp && <Tile label="Participation aux kills">{Math.round(s.killParticipation * 100)}%</Tile>}
-        {m.gold && (
-          <Tile label="Or estimé par minute">
-            {Math.round(s.goldPerMin)}
-            <span className="text-lg text-mute"> · {(s.goldEarned / 1000).toFixed(1)}k</span>
-          </Tile>
-        )}
-        {m.vision && <Tile label="Score de vision">{s.vision}</Tile>}
       </div>
+      {(s.milestones.length > 0 || s.nextMilestone) && (
+        <div className="flex flex-wrap gap-2 text-sm">
+          {s.milestones.map((ms) => (
+            <span key={ms.minute} className={`rounded-lg px-2 py-1 ${ms.cs >= ms.expected ? 'bg-ok/15 text-ok' : 'bg-loss/15 text-loss'}`}>
+              {ms.minute} min : {ms.cs} CS / {ms.expected} attendus
+            </span>
+          ))}
+          {s.nextMilestone && (
+            <span className="rounded-lg bg-white/5 px-2 py-1 text-soft">
+              Objectif {s.nextMilestone.minute} min : {s.nextMilestone.expected} CS
+            </span>
+          )}
+        </div>
+      )}
+      {settings.goldDiffOnTab && (
+        <GoldDiff stats={s} embedded />
+      )}
       {s.position && (
         <div className="card p-5">
           <BuildSummary champion={s.champion} position={s.position} />

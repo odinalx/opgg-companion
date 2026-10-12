@@ -1,10 +1,13 @@
 // Calcul des stats affichées par l'overlay à partir de /liveclientdata/allgamedata.
-// L'API de jeu ne donne ni les dégâts ni l'or total gagné : l'or est estimé
-// (valeur des items possédés + or en poche), les dégâts ne sont pas disponibles.
+// L'API de jeu ne donne ni les dégâts ni l'or gagné : l'or est estimé par la valeur des
+// items possédés (comme le font les overlays du marché), les dégâts ne sont pas disponibles.
 
-import type { LiveStats, Position } from '@shared/types'
+import type { LaneGold, LiveStats, Position, Tier } from '@shared/types'
+import { POSITIONS } from '@shared/types'
+import { benchmark, expectedCs } from '../benchmarks'
 import { championByName } from '../ddragon'
-import { CS_TARGET } from '../skills'
+
+export const MILESTONES = [10, 15, 20]
 
 function livePosition(p: string | undefined): Position | null {
   switch ((p ?? '').toUpperCase()) {
@@ -30,7 +33,10 @@ function championName(p: any): string {
   return (key && championByName(key)?.name) || p.championName || '?'
 }
 
-export function computeLiveStats(data: any): LiveStats | null {
+const itemsValue = (p: any): number =>
+  (p.items ?? []).reduce((a: number, it: any) => a + (it.price ?? 0) * (it.count ?? 1), 0)
+
+export function computeLiveStats(data: any, tier: Tier): LiveStats | null {
   const active = data?.activePlayer
   const players: any[] = data?.allPlayers ?? []
   if (!active || !players.length) return null
@@ -41,11 +47,28 @@ export function computeLiveStats(data: any): LiveStats | null {
   const gameTime = data.gameData?.gameTime ?? 0
   const minutes = Math.max(gameTime / 60, 1 / 60)
   const sc = me.scores ?? {}
-  const teamKills = players.filter((p) => p.team === me.team).reduce((a, p) => a + (p.scores?.kills ?? 0), 0)
-  const itemsValue = (me.items ?? []).reduce((a: number, it: any) => a + (it.price ?? 0) * (it.count ?? 1), 0)
+  const allies = players.filter((p) => p.team === me.team)
+  const enemies = players.filter((p) => p.team !== me.team)
+  const teamKills = allies.reduce((a, p) => a + (p.scores?.kills ?? 0), 0)
   const currentGold = Math.floor(active.currentGold ?? 0)
-  const goldEarned = itemsValue + currentGold
+  const goldEarned = itemsValue(me) + currentGold
   const position = livePosition(me.position)
+  const bench = benchmark(tier, position ?? 'mid')
+  const rate = bench?.csPerMin ?? 0
+  const next = MILESTONES.find((m) => m * 60 > gameTime)
+
+  // Écart d'or par lane : valeur des items de chaque joueur (l'or en poche des autres est inconnu).
+  const lanes: LaneGold[] = POSITIONS.map((pos) => {
+    const a = allies.find((p) => livePosition(p.position) === pos)
+    const e = enemies.find((p) => livePosition(p.position) === pos)
+    return {
+      position: pos,
+      ally: a ? championName(a) : null,
+      enemy: e ? championName(e) : null,
+      diff: (a ? itemsValue(a) : 0) - (e ? itemsValue(e) : 0),
+      mine: pos === position
+    }
+  }).filter((l) => l.ally || l.enemy)
 
   return {
     champion: championName(me),
@@ -54,7 +77,15 @@ export function computeLiveStats(data: any): LiveStats | null {
     level: me.level ?? active.level ?? 1,
     cs: sc.creepScore ?? 0,
     csPerMin: (sc.creepScore ?? 0) / minutes,
-    csTarget: CS_TARGET[position ?? 'mid'],
+    tier,
+    bench,
+    csExpected: expectedCs(rate, minutes),
+    nextMilestone: next && rate ? { minute: next, expected: Math.round(expectedCs(rate, next)) } : null,
+    milestones: [],
+    visionPerMin: (sc.wardScore ?? 0) / minutes,
+    lanes,
+    side: me.team === 'CHAOS' ? 'red' : 'blue',
+    teamGoldDiff: allies.reduce((a, p) => a + itemsValue(p), 0) - enemies.reduce((a, p) => a + itemsValue(p), 0),
     kills: sc.kills ?? 0,
     deaths: sc.deaths ?? 0,
     assists: sc.assists ?? 0,

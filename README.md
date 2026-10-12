@@ -4,12 +4,23 @@ Application Windows (Electron + React) pour League of Legends :
 
 - **Connexion** : « Se connecter avec Riot » ouvre le Riot Client officiel ; une fois LoL lancé, le compte est détecté automatiquement (API locale du client, lecture seule, aucun mot de passe ne passe par l'app). Sans lancer le jeu, on peut consulter n'importe quel Riot ID.
 - **Profil & historique** : rang, LP, champions de la saison, historique détaillé (KDA, CS/min, dégâts, vision, items, runes, détail des 10 joueurs). L'historique est conservé localement et s'enrichit à chaque synchronisation.
-- **Stats** : radar hexagonal du profil de jeu (combat, farm, dégâts, vision, survie, économie) noté par rapport aux repères de chaque rôle, winrate cumulé, stats par champion et par rôle.
+- **Stats** : radar hexagonal du profil de jeu (combat, farm, dégâts, vision, survie, économie) et tuiles comparées aux médianes de ton elo (ou d'un palier au choix, de Fer à Master+), winrate cumulé, stats par champion et par rôle.
 - **Draft helper** : pendant la sélection des champions, propose des picks classés selon cinq critères activables et pondérables :
   winrate perso (lissé), mastery, méta du rôle, matchup contre l'adversaire de lane, synergie avec les alliés.
   Un modèle optionnel (régression logistique) apprend les poids à partir de ton historique.
+  En classée solo, seul l'historique solo compte ; en flex, solo + flex.
+- **Build au lock** : trois sources — statistiques OP.GG du matchup, build général, et builds réels des meilleurs
+  joueurs du champion regroupés en variantes cohérentes (runes + sorts + items joués ensemble). Import en un clic
+  de la page de runes, des sorts (Flash garde ta touche) et d'un set d'items ; import automatique au lock en option.
+- **En jeu** : overlay (mode sans bordure) ou fenêtre sur un second écran. CS et repères 10/15/20 min comparés à
+  la médiane de ton elo, score de vision, écart d'or par lane en maintenant Tab, build à la demande.
 
-Données : [OP.GG MCP](https://github.com/opgginc/opgg-mcp) (`https://mcp-api.op.gg/mcp`), client LoL local (LCU), Riot Data Dragon.
+Données : [OP.GG MCP](https://github.com/opgginc/opgg-mcp) (`https://mcp-api.op.gg/mcp`), client LoL local (LCU),
+API de jeu locale (Live Client Data), Riot Data Dragon.
+
+Les médianes par elo (`src/main/data/benchmarks.json`) sont calculées par `npm run bench:build` sur des games classées
+solo récentes d'OP.GG, classées selon l'elo moyen de la partie. Le score de vision n'étant pas exposé par OP.GG, ses
+repères sont estimés (ordres de grandeur publics par rang, répartis par rôle selon la part de wards mesurée).
 
 ## Développement
 

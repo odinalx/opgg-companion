@@ -6,6 +6,8 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import type {
   BuildOption,
   ChampionBuild,
+  MatchupBuild,
+  RunePage,
   MatchDetail,
   MatchParticipant,
   MatchSummary,
@@ -319,6 +321,90 @@ export class OpggClient {
     })
   }
 
+  /** Runes, sorts et items les plus joués par `champion` contre `opponent` sur cette lane. */
+  getMatchupBuild(champion: string, position: Position, opponent: string): Promise<MatchupBuild> {
+    const key = `mubuild:${opggChampionKey(champion)}:${opggChampionKey(opponent)}:${position}`
+    return this.cache.wrap(key, 6 * HOUR, async () => {
+      const r = await this.call('lol_get_lane_matchup_guide', {
+        position,
+        my_champion: opggChampionKey(champion),
+        opponent_champion: opggChampionKey(opponent)
+      })
+      const d = r?.data ?? {}
+      const option = (o: any): BuildOption => ({
+        ids: o.ids ?? [],
+        names: (o.ids_names ?? []).map(String),
+        games: o.play ?? 0,
+        winRate: o.play ? (o.win ?? 0) / o.play : 0,
+        pickRate: o.pick_rate ?? 0
+      })
+      const top = (list: any[] | undefined, n = 2): BuildOption[] =>
+        (list ?? []).map(option).filter((o) => o.ids.length).sort((a, b) => b.games - a.games).slice(0, n)
+      return {
+        champion,
+        opponent,
+        position,
+        runePages: (d.runes ?? []).map(toRunePage).sort((a: RunePage, b: RunePage) => b.games - a.games).slice(0, 2),
+        spells: top(d.summoner_spells),
+        starter: top(d.starter_items, 1)[0] ?? null,
+        boots: top(d.boots),
+        cores: top(d.core_items),
+        skillOrder: (d.skills?.[0]?.order ?? []).map(String)
+      }
+    })
+  }
+
+  /**
+   * Toutes les pages de runes complètes connues pour ce champion (général + matchup), pour
+   * compléter une game où seules la keystone et l'arbre secondaire sont connus.
+   */
+  async getRunePages(champion: string, position: Position, opponent: string | null): Promise<RunePage[]> {
+    const pages: RunePage[] = []
+    if (opponent) {
+      try {
+        const r = await this.cache.wrap(
+          `mupages:${opggChampionKey(champion)}:${opggChampionKey(opponent)}:${position}`,
+          6 * HOUR,
+          async () => {
+            const raw = await this.call('lol_get_lane_matchup_guide', {
+              position,
+              my_champion: opggChampionKey(champion),
+              opponent_champion: opggChampionKey(opponent)
+            })
+            return [
+              ...(raw?.data?.runes ?? []).map(toRunePage),
+              ...(raw?.data?.rune_pages ?? []).flatMap((p: any) => (p.builds ?? []).map(toRunePage))
+            ]
+          }
+        )
+        pages.push(...r)
+      } catch {
+        /* matchup indisponible */
+      }
+    }
+    const general = await this.getBuild(champion, position).catch(() => null)
+    if (general?.runes) pages.push(general.runes)
+    return pages
+  }
+
+  /** Meilleurs joueurs (master+) du champion dans une région. */
+  getLeaderboard(champion: string, region: string): Promise<Array<{ gameName: string; tagLine: string; tier: string | null }>> {
+    return this.cache.wrap(`lb:${opggChampionKey(champion)}:${region}`, 6 * HOUR, async () => {
+      const r = await this.call('lol_list_champion_leaderboard', {
+        region,
+        champion: opggChampionKey(champion),
+        desired_output_fields: ['leaderboard[].summoner.{game_name,tagline}', 'leaderboard[].summoner.league_stats[].tier_info.{tier}']
+      })
+      return (r?.leaderboard ?? [])
+        .filter((l: any) => l.summoner?.game_name)
+        .map((l: any) => ({
+          gameName: l.summoner.game_name,
+          tagLine: l.summoner.tagline,
+          tier: l.summoner.league_stats?.[0]?.tier_info?.tier ?? null
+        }))
+    })
+  }
+
   /** Meilleurs partenaires (à `partnerPosition`) pour `champion` joué en `position`. */
   getSynergies(champion: string, position: Position, partnerPosition: Position): Promise<SynergyTable> {
     const key = `syn:${opggChampionKey(champion)}:${position}:${partnerPosition}`
@@ -379,5 +465,19 @@ function toMatchSummary(g: any): MatchSummary | null {
     allyBans: myTeam?.banned_champions_names ?? [],
     enemyBans: enemyTeam?.banned_champions_names ?? [],
     avgTier: tier ? `${tier}${g.average_tier_info?.division ? ' ' + g.average_tier_info.division : ''}` : null
+  }
+}
+
+function toRunePage(r: any): RunePage {
+  return {
+    primaryStyle: r.primary_page_id,
+    primaryName: r.primary_page_name ?? '',
+    subStyle: r.secondary_page_id,
+    subName: r.secondary_page_name ?? '',
+    perks: [...(r.primary_rune_ids ?? []), ...(r.secondary_rune_ids ?? [])],
+    perkNames: [...(r.primary_rune_names ?? []), ...(r.secondary_rune_names ?? [])].map(String),
+    shards: r.stat_mod_ids ?? [],
+    games: r.play ?? 0,
+    winRate: r.play ? (r.win ?? 0) / r.play : 0
   }
 }

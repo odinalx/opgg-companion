@@ -145,6 +145,7 @@ export function DraftPage() {
               <BuildPanel
                 champion={buildChampion}
                 position={state.myPosition}
+                opponent={result?.enemyLaner ?? null}
                 locked={isLive && state.pickedByMe === buildChampion}
                 onClose={isLive && state.pickedByMe ? undefined : () => setViewBuild(null)}
               />

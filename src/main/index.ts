@@ -20,6 +20,7 @@ function loadRenderer(w: BrowserWindow, query = ''): void {
 
 const overlay = new OverlayManager(
   () => service.getSettings().overlay,
+  () => service.comparisonTier(),
   (w) => loadRenderer(w, '?overlay=1'),
   join(here, '../preload/index.cjs')
 )
@@ -45,6 +46,9 @@ const handlers: { [K in ApiMethod]: (...args: Parameters<Api[K]>) => ReturnType<
   trainModel: () => service.trainModel((done, total) => win?.webContents.send('model:progress', { done, total })),
   getBuild: (champion, position) => service.opgg.getBuild(champion, position),
   importBuild: (champion, position, parts) => service.importBuild(champion, position, parts),
+  getMatchupBuild: (champion, position, opponent) => service.opgg.getMatchupBuild(champion, position, opponent),
+  getProBuilds: (champion, position, opponent) => service.getProBuilds(champion, position, opponent),
+  importBuildData: (build, parts) => service.importBuildData(build, parts),
   getOverlayState: () => ({ stats: overlay.getStats(), ui: overlay.getUi(), settings: service.getSettings().overlay }),
   getDisplays: () => {
     const primary = screen.getPrimaryDisplay().id
@@ -109,7 +113,7 @@ async function captureAllPages(w: BrowserWindow, dir: string): Promise<void> {
     await w.webContents.executeJavaScript(
       `document.querySelector('[data-nav="draft"]').click(); setTimeout(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === ${JSON.stringify(clickLabel)})?.click(), 800)`
     )
-    await wait(6000)
+    await wait(Number(process.env.OPGG_CAPTURE_CLICK_WAIT ?? 6000))
     writeFileSync(join(dir, 'draft-click.png'), (await w.webContents.capturePage()).toPNG())
   }
   // OPGG_CAPTURE_OVERLAY=1 : capture l'overlay (HUD puis build) pendant une partie simulée.
@@ -120,6 +124,9 @@ async function captureAllPages(w: BrowserWindow, dir: string): Promise<void> {
       overlay.setUi({ showBuild: true })
       await wait(5000)
       writeFileSync(join(dir, 'overlay-build.png'), (await ow.webContents.capturePage()).toPNG())
+      overlay.setUi({ showBuild: false, tabHeld: true })
+      await wait(1500)
+      writeFileSync(join(dir, 'overlay-tab.png'), (await ow.webContents.capturePage()).toPNG())
     } else writeFileSync(join(dir, 'overlay-missing.txt'), 'aucune partie détectée')
   }
   // OPGG_CAPTURE_SIM="jungle|Ahri,Garen|Vi,Jinx,Darius" : simulation de draft (rôle|alliés|ennemis).

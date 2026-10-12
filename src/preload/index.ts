@@ -19,6 +19,9 @@ const methods: ApiMethod[] = [
   'getBuild',
   'importBuild',
   'getOverlayState',
+  'getMatchupBuild',
+  'getProBuilds',
+  'importBuildData',
   'getDisplays',
   'launchRiotClient',
   'signOut'

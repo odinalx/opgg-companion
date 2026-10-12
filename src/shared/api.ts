@@ -19,7 +19,9 @@ import type {
   LiveStats,
   OverlaySettings,
   OverlayUi,
-  DisplayInfo
+  DisplayInfo,
+  MatchupBuild,
+  ProBuilds
 } from './types'
 
 export interface StaticDataDto {
@@ -27,6 +29,7 @@ export interface StaticDataDto {
   champions: ChampionInfo[]
   spells: Record<number, string>
   runes: Record<number, string>
+  items: Record<number, { name: string; gold: number; completed: boolean; boots: boolean }>
 }
 
 export interface DraftResultDto {
@@ -54,6 +57,9 @@ export interface Api {
   openExternal(url: string): Promise<void>
   getBuild(champion: string, position: Position): Promise<ChampionBuild>
   importBuild(champion: string, position: Position, parts: { runes?: boolean; spells?: boolean; items?: boolean }): Promise<ImportResult>
+  getMatchupBuild(champion: string, position: Position, opponent: string): Promise<MatchupBuild>
+  getProBuilds(champion: string, position: Position, opponent: string | null): Promise<ProBuilds>
+  importBuildData(build: ChampionBuild, parts: { runes?: boolean; spells?: boolean; items?: boolean }): Promise<ImportResult>
   getOverlayState(): Promise<{ stats: LiveStats | null; ui: OverlayUi; settings: OverlaySettings }>
   getDisplays(): Promise<DisplayInfo[]>
   launchRiotClient(): Promise<void>

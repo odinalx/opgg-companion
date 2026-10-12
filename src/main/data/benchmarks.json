@@ -1,0 +1,432 @@
+{
+  "generatedAt": "2026-10-12T13:55:18.151Z",
+  "source": "OP.GG MCP — games classées solo/duo récentes, classées par elo moyen de la partie (médianes)",
+  "gamesPerTier": {
+    "IRON": 40,
+    "BRONZE": 40,
+    "SILVER": 40,
+    "GOLD": 40,
+    "PLATINUM": 40,
+    "EMERALD": 40,
+    "DIAMOND": 40,
+    "MASTER": 40
+  },
+  "tiers": {
+    "IRON": {
+      "top": {
+        "samples": 80,
+        "csPerMin": 5.48,
+        "goldPerMin": 384,
+        "damagePerMin": 757,
+        "wardsPerMin": 0.29,
+        "deathsPer10": 2.24,
+        "kda": 1.76,
+        "killParticipation": 0.32
+      },
+      "jungle": {
+        "samples": 80,
+        "csPerMin": 5.32,
+        "goldPerMin": 402,
+        "damagePerMin": 573,
+        "wardsPerMin": 0.29,
+        "deathsPer10": 2.31,
+        "kda": 2.1,
+        "killParticipation": 0.39
+      },
+      "mid": {
+        "samples": 80,
+        "csPerMin": 5.32,
+        "goldPerMin": 391,
+        "damagePerMin": 788,
+        "wardsPerMin": 0.28,
+        "deathsPer10": 2.31,
+        "kda": 2.39,
+        "killParticipation": 0.43
+      },
+      "adc": {
+        "samples": 80,
+        "csPerMin": 5.31,
+        "goldPerMin": 433,
+        "damagePerMin": 668,
+        "wardsPerMin": 0.32,
+        "deathsPer10": 2.11,
+        "kda": 2.52,
+        "killParticipation": 0.44
+      },
+      "support": {
+        "samples": 80,
+        "csPerMin": 1.57,
+        "goldPerMin": 322,
+        "damagePerMin": 520,
+        "wardsPerMin": 0.73,
+        "deathsPer10": 2.32,
+        "kda": 2.53,
+        "killParticipation": 0.48
+      }
+    },
+    "BRONZE": {
+      "top": {
+        "samples": 80,
+        "csPerMin": 6.1,
+        "goldPerMin": 385,
+        "damagePerMin": 770,
+        "wardsPerMin": 0.32,
+        "deathsPer10": 2.26,
+        "kda": 1.75,
+        "killParticipation": 0.33
+      },
+      "jungle": {
+        "samples": 80,
+        "csPerMin": 5.71,
+        "goldPerMin": 419,
+        "damagePerMin": 637,
+        "wardsPerMin": 0.26,
+        "deathsPer10": 2.33,
+        "kda": 1.97,
+        "killParticipation": 0.44
+      },
+      "mid": {
+        "samples": 80,
+        "csPerMin": 5.84,
+        "goldPerMin": 398,
+        "damagePerMin": 892,
+        "wardsPerMin": 0.32,
+        "deathsPer10": 2.43,
+        "kda": 2,
+        "killParticipation": 0.45
+      },
+      "adc": {
+        "samples": 80,
+        "csPerMin": 5.81,
+        "goldPerMin": 456,
+        "damagePerMin": 771,
+        "wardsPerMin": 0.33,
+        "deathsPer10": 2.41,
+        "kda": 2.23,
+        "killParticipation": 0.46
+      },
+      "support": {
+        "samples": 80,
+        "csPerMin": 1.62,
+        "goldPerMin": 323,
+        "damagePerMin": 503,
+        "wardsPerMin": 0.83,
+        "deathsPer10": 2.14,
+        "kda": 2.9,
+        "killParticipation": 0.47
+      }
+    },
+    "SILVER": {
+      "top": {
+        "samples": 80,
+        "csPerMin": 6.43,
+        "goldPerMin": 402,
+        "damagePerMin": 826,
+        "wardsPerMin": 0.33,
+        "deathsPer10": 2.21,
+        "kda": 1.68,
+        "killParticipation": 0.38
+      },
+      "jungle": {
+        "samples": 80,
+        "csPerMin": 6.16,
+        "goldPerMin": 425,
+        "damagePerMin": 608,
+        "wardsPerMin": 0.27,
+        "deathsPer10": 1.97,
+        "kda": 2.44,
+        "killParticipation": 0.47
+      },
+      "mid": {
+        "samples": 80,
+        "csPerMin": 5.97,
+        "goldPerMin": 394,
+        "damagePerMin": 860,
+        "wardsPerMin": 0.32,
+        "deathsPer10": 2.19,
+        "kda": 2,
+        "killParticipation": 0.43
+      },
+      "adc": {
+        "samples": 80,
+        "csPerMin": 6.09,
+        "goldPerMin": 438,
+        "damagePerMin": 712,
+        "wardsPerMin": 0.31,
+        "deathsPer10": 2.2,
+        "kda": 2.47,
+        "killParticipation": 0.48
+      },
+      "support": {
+        "samples": 80,
+        "csPerMin": 1.15,
+        "goldPerMin": 319,
+        "damagePerMin": 473,
+        "wardsPerMin": 0.83,
+        "deathsPer10": 1.92,
+        "kda": 2.83,
+        "killParticipation": 0.55
+      }
+    },
+    "GOLD": {
+      "top": {
+        "samples": 80,
+        "csPerMin": 6.76,
+        "goldPerMin": 407,
+        "damagePerMin": 733,
+        "wardsPerMin": 0.32,
+        "deathsPer10": 2.38,
+        "kda": 1.63,
+        "killParticipation": 0.35
+      },
+      "jungle": {
+        "samples": 80,
+        "csPerMin": 6.38,
+        "goldPerMin": 426,
+        "damagePerMin": 611,
+        "wardsPerMin": 0.31,
+        "deathsPer10": 1.84,
+        "kda": 2.93,
+        "killParticipation": 0.46
+      },
+      "mid": {
+        "samples": 80,
+        "csPerMin": 6.63,
+        "goldPerMin": 430,
+        "damagePerMin": 839,
+        "wardsPerMin": 0.36,
+        "deathsPer10": 2.09,
+        "kda": 2,
+        "killParticipation": 0.43
+      },
+      "adc": {
+        "samples": 80,
+        "csPerMin": 6.9,
+        "goldPerMin": 466,
+        "damagePerMin": 837,
+        "wardsPerMin": 0.3,
+        "deathsPer10": 2.47,
+        "kda": 2.29,
+        "killParticipation": 0.46
+      },
+      "support": {
+        "samples": 80,
+        "csPerMin": 1.24,
+        "goldPerMin": 322,
+        "damagePerMin": 431,
+        "wardsPerMin": 1.08,
+        "deathsPer10": 2.41,
+        "kda": 2.35,
+        "killParticipation": 0.51
+      }
+    },
+    "PLATINUM": {
+      "top": {
+        "samples": 80,
+        "csPerMin": 6.91,
+        "goldPerMin": 427,
+        "damagePerMin": 837,
+        "wardsPerMin": 0.34,
+        "deathsPer10": 2.21,
+        "kda": 2,
+        "killParticipation": 0.34
+      },
+      "jungle": {
+        "samples": 80,
+        "csPerMin": 6.65,
+        "goldPerMin": 444,
+        "damagePerMin": 708,
+        "wardsPerMin": 0.24,
+        "deathsPer10": 2.05,
+        "kda": 2.53,
+        "killParticipation": 0.5
+      },
+      "mid": {
+        "samples": 80,
+        "csPerMin": 6.72,
+        "goldPerMin": 426,
+        "damagePerMin": 915,
+        "wardsPerMin": 0.32,
+        "deathsPer10": 2.35,
+        "kda": 2,
+        "killParticipation": 0.41
+      },
+      "adc": {
+        "samples": 80,
+        "csPerMin": 7.32,
+        "goldPerMin": 462,
+        "damagePerMin": 806,
+        "wardsPerMin": 0.32,
+        "deathsPer10": 2.07,
+        "kda": 2.21,
+        "killParticipation": 0.42
+      },
+      "support": {
+        "samples": 80,
+        "csPerMin": 1.06,
+        "goldPerMin": 306,
+        "damagePerMin": 331,
+        "wardsPerMin": 1.14,
+        "deathsPer10": 2.13,
+        "kda": 2.18,
+        "killParticipation": 0.52
+      }
+    },
+    "EMERALD": {
+      "top": {
+        "samples": 80,
+        "csPerMin": 7.11,
+        "goldPerMin": 418,
+        "damagePerMin": 772,
+        "wardsPerMin": 0.35,
+        "deathsPer10": 2.18,
+        "kda": 1.75,
+        "killParticipation": 0.34
+      },
+      "jungle": {
+        "samples": 80,
+        "csPerMin": 6.9,
+        "goldPerMin": 462,
+        "damagePerMin": 649,
+        "wardsPerMin": 0.24,
+        "deathsPer10": 1.88,
+        "kda": 2.73,
+        "killParticipation": 0.49
+      },
+      "mid": {
+        "samples": 80,
+        "csPerMin": 7.23,
+        "goldPerMin": 429,
+        "damagePerMin": 834,
+        "wardsPerMin": 0.34,
+        "deathsPer10": 2.29,
+        "kda": 1.72,
+        "killParticipation": 0.42
+      },
+      "adc": {
+        "samples": 80,
+        "csPerMin": 7.42,
+        "goldPerMin": 471,
+        "damagePerMin": 755,
+        "wardsPerMin": 0.31,
+        "deathsPer10": 2.1,
+        "kda": 2.5,
+        "killParticipation": 0.45
+      },
+      "support": {
+        "samples": 80,
+        "csPerMin": 1.07,
+        "goldPerMin": 311,
+        "damagePerMin": 371,
+        "wardsPerMin": 1.22,
+        "deathsPer10": 2.16,
+        "kda": 2.42,
+        "killParticipation": 0.49
+      }
+    },
+    "DIAMOND": {
+      "top": {
+        "samples": 80,
+        "csPerMin": 7.36,
+        "goldPerMin": 425,
+        "damagePerMin": 791,
+        "wardsPerMin": 0.35,
+        "deathsPer10": 2.04,
+        "kda": 1.67,
+        "killParticipation": 0.38
+      },
+      "jungle": {
+        "samples": 80,
+        "csPerMin": 6.96,
+        "goldPerMin": 463,
+        "damagePerMin": 707,
+        "wardsPerMin": 0.21,
+        "deathsPer10": 1.98,
+        "kda": 2.62,
+        "killParticipation": 0.53
+      },
+      "mid": {
+        "samples": 80,
+        "csPerMin": 7.37,
+        "goldPerMin": 411,
+        "damagePerMin": 812,
+        "wardsPerMin": 0.34,
+        "deathsPer10": 1.99,
+        "kda": 2,
+        "killParticipation": 0.44
+      },
+      "adc": {
+        "samples": 80,
+        "csPerMin": 7.9,
+        "goldPerMin": 479,
+        "damagePerMin": 826,
+        "wardsPerMin": 0.29,
+        "deathsPer10": 1.97,
+        "kda": 2.5,
+        "killParticipation": 0.48
+      },
+      "support": {
+        "samples": 80,
+        "csPerMin": 0.93,
+        "goldPerMin": 297,
+        "damagePerMin": 306,
+        "wardsPerMin": 1.33,
+        "deathsPer10": 2.27,
+        "kda": 3,
+        "killParticipation": 0.57
+      }
+    },
+    "MASTER": {
+      "top": {
+        "samples": 80,
+        "csPerMin": 7.4,
+        "goldPerMin": 402,
+        "damagePerMin": 740,
+        "wardsPerMin": 0.36,
+        "deathsPer10": 2.05,
+        "kda": 1.8,
+        "killParticipation": 0.34
+      },
+      "jungle": {
+        "samples": 80,
+        "csPerMin": 6.92,
+        "goldPerMin": 463,
+        "damagePerMin": 757,
+        "wardsPerMin": 0.28,
+        "deathsPer10": 1.88,
+        "kda": 2.85,
+        "killParticipation": 0.52
+      },
+      "mid": {
+        "samples": 80,
+        "csPerMin": 7.38,
+        "goldPerMin": 422,
+        "damagePerMin": 848,
+        "wardsPerMin": 0.35,
+        "deathsPer10": 1.94,
+        "kda": 2.21,
+        "killParticipation": 0.44
+      },
+      "adc": {
+        "samples": 80,
+        "csPerMin": 8.04,
+        "goldPerMin": 500,
+        "damagePerMin": 889,
+        "wardsPerMin": 0.33,
+        "deathsPer10": 2.33,
+        "kda": 2.46,
+        "killParticipation": 0.5
+      },
+      "support": {
+        "samples": 80,
+        "csPerMin": 0.98,
+        "goldPerMin": 309,
+        "damagePerMin": 328,
+        "wardsPerMin": 1.5,
+        "deathsPer10": 2.05,
+        "kda": 2.85,
+        "killParticipation": 0.58
+      }
+    }
+  }
+}

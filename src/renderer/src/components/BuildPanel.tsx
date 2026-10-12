@@ -3,6 +3,7 @@ import type { BuildOption, ChampionBuild, ImportResult, Position } from '@shared
 import { useApp } from '../store'
 import { ChampIcon, ItemIcon, RuneIcon, SpellIcon } from './Icons'
 import { Button, Spinner } from './ui'
+import { MatchupTab, ProTab } from './BuildSources'
 import { positionLabel } from '../lib/format'
 
 // Fragments de stats : absents de runesReforged.json, on les décrit ici.
@@ -20,17 +21,35 @@ const SHARDS: Record<number, { name: string; icon: string }> = {
 
 const pct = (x: number): string => `${Math.round(x * 100)}%`
 
+type Tab = 'matchup' | 'general' | 'pro'
+
 export function BuildPanel({
   champion,
   position,
+  opponent,
   locked,
   onClose
 }: {
   champion: string
   position: Position
+  opponent: string | null
   locked: boolean
   onClose?: () => void
 }) {
+  const [tab, setTab] = useState<Tab>(opponent ? 'matchup' : 'general')
+  const [chosen, setChosen] = useState(false) // l'utilisateur a choisi un onglet lui-même
+  useEffect(() => {
+    if (!chosen) setTab(opponent ? 'matchup' : 'general')
+    else if (!opponent) setTab((t) => (t === 'matchup' ? 'general' : t))
+  }, [opponent, chosen])
+  const pick = (t: Tab): void => {
+    setChosen(true)
+    setTab(t)
+  }
+  // Les builds high elo sont longs à réunir la première fois : on les prépare dès l'ouverture.
+  useEffect(() => {
+    void window.api.getProBuilds(champion, position, opponent).catch(() => undefined)
+  }, [champion, position, opponent])
   const connected = useApp((s) => s.status.connected)
   const [build, setBuild] = useState<ChampionBuild | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -68,12 +87,16 @@ export function BuildPanel({
           </h2>
         </div>
         <div className="flex flex-wrap gap-2">
+          {tab === 'general' && (
+          <>
           <Button variant="primary" disabled={!connected || !build || !!busy} onClick={() => void runImport('rs', { runes: true, spells: true })}>
             {busy === 'rs' ? 'Import…' : 'Importer runes et sorts'}
           </Button>
           <Button disabled={!connected || !build || !!busy} onClick={() => void runImport('items', { items: true })}>
             {busy === 'items' ? 'Création…' : "Créer le set d'items"}
           </Button>
+          </>
+          )}
           {onClose && (
             <Button variant="ghost" onClick={onClose}>
               Fermer
@@ -82,10 +105,24 @@ export function BuildPanel({
         </div>
       </header>
 
-      {!connected && <p className="px-5 pt-3 text-sm text-mute">Lance le client LoL pour importer ce build en un clic.</p>}
+      <div className="flex gap-1 border-b border-line px-5" role="tablist">
+        {opponent && <TabButton active={tab === 'matchup'} onClick={() => pick('matchup')}>Contre {opponent}</TabButton>}
+        <TabButton active={tab === 'general'} onClick={() => pick('general')}>Général</TabButton>
+        <TabButton active={tab === 'pro'} onClick={() => pick('pro')}>High elo</TabButton>
+      </div>
+
+      {!connected && <p className="px-5 pt-3 text-sm text-mute">Lance le client LoL pour importer un build en un clic.</p>}
       {result && <ImportFeedback result={result} />}
 
-      {error ? (
+      {tab === 'matchup' && opponent ? (
+        <div className="px-5 py-5">
+          <MatchupTab champion={champion} position={position} opponent={opponent} onResult={setResult} />
+        </div>
+      ) : tab === 'pro' ? (
+        <div className="px-5 py-5">
+          <ProTab champion={champion} position={position} opponent={opponent} onResult={setResult} />
+        </div>
+      ) : error ? (
         <p className="px-5 py-4 text-sm text-loss">Build indisponible : {error}</p>
       ) : !build ? (
         <div className="px-5">
@@ -115,6 +152,19 @@ export function BuildPanel({
         </div>
       )}
     </article>
+  )
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`-mb-px border-b-2 px-3 py-2.5 text-sm font-semibold ${active ? 'border-accent text-ink' : 'border-transparent text-mute hover:text-ink'}`}
+    >
+      {children}
+    </button>
   )
 }
 

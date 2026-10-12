@@ -11,6 +11,14 @@ export interface StaticData {
   champions: ChampionInfo[]
   spells: Record<number, string> // id numérique -> clé image (ex: 4 -> "SummonerFlash")
   runes: Record<number, string> // id rune/style -> chemin icône
+  items: Record<number, ItemInfo>
+}
+
+export interface ItemInfo {
+  name: string
+  gold: number
+  completed: boolean // ne se combine plus en un autre item
+  boots: boolean
 }
 
 let data: StaticData | null = null
@@ -33,11 +41,20 @@ export function loadStaticData(): Promise<StaticData> {
   loading ??= (async () => {
     const versions: string[] = await getJson(`${BASE}/api/versions.json`)
     const version = versions[0]
-    const [champs, summoners, runes] = await Promise.all([
+    const [champs, summoners, runes, itemsJson] = await Promise.all([
       getJson(`${BASE}/cdn/${version}/data/en_US/champion.json`),
       getJson(`${BASE}/cdn/${version}/data/en_US/summoner.json`),
-      getJson(`${BASE}/cdn/${version}/data/en_US/runesReforged.json`)
+      getJson(`${BASE}/cdn/${version}/data/en_US/runesReforged.json`),
+      getJson(`${BASE}/cdn/${version}/data/en_US/item.json`)
     ])
+    const items: Record<number, ItemInfo> = {}
+    for (const [id, it] of Object.entries<any>(itemsJson.data))
+      items[Number(id)] = {
+        name: it.name,
+        gold: it.gold?.total ?? 0,
+        completed: !it.into?.length,
+        boots: (it.tags ?? []).includes('Boots')
+      }
     const champions: ChampionInfo[] = Object.values<any>(champs.data)
       .map((c) => ({ id: Number(c.key), key: c.id, name: c.name }))
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -48,7 +65,7 @@ export function loadStaticData(): Promise<StaticData> {
       runeIcons[style.id] = style.icon
       for (const slot of style.slots) for (const r of slot.runes) runeIcons[r.id] = r.icon
     }
-    data = { version, champions, spells, runes: runeIcons }
+    data = { version, champions, spells, runes: runeIcons, items }
     setChampions(champions)
     return data
   })().finally(() => (loading = null))
@@ -79,4 +96,8 @@ export function championByName(name: string): ChampionInfo | undefined {
 export function opggChampionKey(name: string): string {
   const c = championByName(name)
   return (c?.key ?? name).toUpperCase().replace(/[^A-Z0-9]/g, '')
+}
+
+export function itemInfo(id: number): ItemInfo | undefined {
+  return data?.items[id]
 }

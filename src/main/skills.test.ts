@@ -1,6 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import type { MatchSummary } from '@shared/types'
+import type { Position, Tier, TierBenchmark } from '@shared/types'
 import { rate, skillProfile } from './skills'
+
+// Médianes factices : Or = référence, Émeraude (deux paliers au-dessus) = « très bon ».
+const fake = (tier: Tier, position: Position): TierBenchmark => {
+  const up = tier === 'EMERALD'
+  const sup = position === 'support'
+  return {
+    samples: 100,
+    csPerMin: sup ? (up ? 1.4 : 1) : up ? 7 : 6,
+    goldPerMin: up ? 420 : 380,
+    damagePerMin: up ? 800 : 650,
+    wardsPerMin: sup ? (up ? 1.6 : 1.2) : up ? 0.5 : 0.4,
+    deathsPer10: up ? 1.6 : 2,
+    kda: up ? 3.2 : 2.6,
+    killParticipation: 0.5,
+    visionPerMin: 1
+  }
+}
 
 const game = (over: Partial<MatchSummary>): MatchSummary =>
   ({
@@ -46,15 +64,15 @@ describe('rate', () => {
 
 describe('skillProfile', () => {
   it('note un support sur ses propres repères', () => {
-    const sup = skillProfile([game({ position: 'support', cs: 30, damage: 10200, wardsPlaced: 45, visionWards: 12, gold: 7650 })])
+    const sup = skillProfile([game({ position: 'support', cs: 30, damage: 10200, wardsPlaced: 36, visionWards: 12, gold: 7650 })], 'GOLD', fake)
     const farm = sup.find((a) => a.key === 'farm')!
-    expect(farm.overall).toBe(50) // 1 CS/min = repère médian d'un support
-    expect(sup.find((a) => a.key === 'vision')!.overall).toBeGreaterThan(80)
+    expect(farm.overall).toBe(50) // 1 CS/min = médiane Or d'un support
+    expect(sup.find((a) => a.key === 'vision')!.overall).toBe(90) // 1.6 wards/min = médiane Émeraude
   })
   it('ignore les games sans rôle et les remakes, et ne calcule la forme récente qu’avec assez de games', () => {
-    const res = skillProfile([game({ position: null }), game({ remake: true }), game({})])
+    const res = skillProfile([game({ position: null }), game({ remake: true }), game({})], 'GOLD', fake)
     expect(res).toHaveLength(6)
     expect(res[0].recent).toBeNull()
-    expect(skillProfile([game({ position: null })])).toEqual([])
+    expect(skillProfile([game({ position: null })], 'GOLD', fake)).toEqual([])
   })
 })

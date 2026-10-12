@@ -2,6 +2,10 @@
 // Toutes les méthodes publiques sont exposées au renderer via IPC (voir index.ts).
 
 import type {
+  Tier,
+  ChampionBuild,
+  ProBuilds,
+  Region,
   ImportResult,
   ClientStatus,
   DraftQueue,
@@ -16,7 +20,9 @@ import type {
   StatsAggregate
 } from '@shared/types'
 import { DEFAULT_SETTINGS } from '@shared/types'
-import { championById, loadStaticData, type StaticData } from './ddragon'
+import { championById, loadStaticData, normalizeName, type StaticData } from './ddragon'
+import { groupVariants, type SourcedGame } from './builds/variants'
+import { tierBucket } from './benchmarks'
 import { type DraftResult, DraftEngine, type PlayerContext } from './draft/engine'
 import { featureVector } from './draft/score'
 import { MIN_SAMPLES, type Sample, trainModel } from './draft/train'
@@ -24,7 +30,7 @@ import { sessionToDraft, lcuPosition } from './lcu/champSelect'
 import { LcuConnector } from './lcu/connector'
 import { importBuild } from './lcu/importer'
 import { OpggClient } from './opgg/client'
-import { aggregate, filterMatches, matchesForDraft, mergeMatches } from './stats'
+import { aggregate, filterMatches, matchesForDraft, mergeMatches, RANKED_QUEUES } from './stats'
 import { DiskCache, JsonFile, dataPath } from './store'
 
 type Emit = (channel: string, payload: unknown) => void
@@ -199,7 +205,7 @@ export class AppService {
 
   async getStats(acc: RiotAccount): Promise<StatsAggregate> {
     const { matches } = await this.getMatches(acc, false)
-    return aggregate(filterMatches(matches, this.settings.get().queueFilter))
+    return aggregate(filterMatches(matches, this.settings.get().queueFilter), await this.comparisonTier())
   }
 
   // ---------- Draft helper ----------
@@ -253,6 +259,22 @@ export class AppService {
     return this.engine.suggest(state, player, settings, modelWeights)
   }
 
+  /** Palier de comparaison : choisi dans les réglages, sinon rang solo du compte (Or par défaut). */
+  async comparisonTier(): Promise<Tier> {
+    const chosen = this.settings.get().compareTier
+    if (chosen !== 'auto') return chosen
+    const acc = this.currentAccount()
+    if (!acc) return 'GOLD'
+    try {
+      const profile = await this.opgg.getProfile(acc)
+      const solo = profile.ranked.find((r) => r.queue === 'SOLORANKED')
+      const flex = profile.ranked.find((r) => r.queue === 'FLEXRANKED')
+      return tierBucket(solo?.tier) ?? tierBucket(flex?.tier) ?? 'GOLD'
+    } catch {
+      return 'GOLD'
+    }
+  }
+
   // ---------- Build ----------
 
   async importBuild(
@@ -287,6 +309,82 @@ export class AppService {
     } catch (e) {
       this.emit('build:auto-imported', { champion: draft.pickedByMe, errors: [(e as Error).message] })
     }
+  }
+
+  /**
+   * Builds réels des meilleurs joueurs du champion (classement OP.GG de ta région et de la
+   * Corée), regroupés en variantes. Avec un adversaire, chaque game récente est ouverte pour
+   * savoir contre qui elle a été jouée.
+   */
+  async getProBuilds(champion: string, position: Position, opponent: string | null): Promise<ProBuilds> {
+    await loadStaticData()
+    const region = this.currentAccount()?.region ?? this.settings.get().region
+    const regions = [...new Set([region, 'KR'])]
+    const boards = await Promise.allSettled(regions.map((r) => this.opgg.getLeaderboard(champion, r)))
+    const players = boards.flatMap((b, i) =>
+      b.status === 'fulfilled' ? b.value.slice(0, 5).map((p) => ({ ...p, region: regions[i] as Region })) : []
+    )
+    const histories = await Promise.allSettled(
+      players.map((p) => this.opgg.listMatches({ gameName: p.gameName, tagLine: p.tagLine, region: p.region }, 20))
+    )
+    const same = (a: string, b: string) => normalizeName(a) === normalizeName(b)
+    const games: SourcedGame[] = histories
+      .flatMap((h, i) => (h.status === 'fulfilled' ? h.value.map((match) => ({ match, p: players[i] })) : []))
+      .filter(({ match }) => same(match.champion, champion) && !match.remake && RANKED_QUEUES.has(match.queue))
+      .filter(({ match }) => !match.position || match.position === position)
+      .sort((a, b) => Date.parse(b.match.createdAt) - Date.parse(a.match.createdAt))
+      .slice(0, 40)
+      .map(({ match, p }) => ({
+        match,
+        game: {
+          player: `${p.gameName}#${p.tagLine}`,
+          tier: p.tier,
+          region: p.region,
+          createdAt: match.createdAt,
+          win: match.win,
+          kills: match.kills,
+          deaths: match.deaths,
+          assists: match.assists,
+          opponent: null
+        }
+      }))
+
+    if (opponent) {
+      // On identifie l'adversaire de lane des 16 games les plus récentes (détails mis en cache).
+      const queue = games.slice(0, 16)
+      const worker = async (): Promise<void> => {
+        for (let g = queue.shift(); g; g = queue.shift()) {
+          try {
+            const [gameName, tagLine] = g.game.player.split('#')
+            const detail = await this.opgg.getMatchDetail({ gameName, tagLine, region: g.game.region as Region }, g.match.id, g.match.createdAt)
+            const all = detail.teams.flatMap((t) => t.participants)
+            const me = all.find((p) => p.isTarget)
+            const opp = me && all.find((p) => p.team !== me.team && p.position === me.position)
+            g.game.opponent = opp?.champion ?? null
+          } catch {
+            /* détail indisponible */
+          }
+        }
+      }
+      await Promise.all(Array.from({ length: 4 }, worker))
+    }
+
+    const pages = await this.opgg.getRunePages(champion, position, opponent)
+    return {
+      champion,
+      position,
+      opponent,
+      gamesAnalyzed: games.length,
+      players: new Set(games.map((g) => g.game.player)).size,
+      variants: groupVariants(games, pages, opponent)
+    }
+  }
+
+  /** Import d'un build composé dans l'interface (variante high elo, page du matchup…). */
+  async importBuildData(build: ChampionBuild, parts: { runes?: boolean; spells?: boolean; items?: boolean }): Promise<ImportResult> {
+    if (!this.lcu.getStatus().connected) throw new Error('Lance le client LoL pour importer le build.')
+    await loadStaticData()
+    return importBuild(this.lcu, build, parts)
   }
 
   // ---------- Modèle ML ----------

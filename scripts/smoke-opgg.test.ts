@@ -83,3 +83,21 @@ describe.runIf(process.env.SMOKE)('OP.GG MCP (réseau)', { timeout: 120_000 }, (
     })
   }
 })
+
+describe.runIf(process.env.SMOKE)('Builds matchup et high elo (réseau)', { timeout: 240_000 }, () => {
+  it('Nasus top contre Darius', async () => {
+    const { AppService } = await import('../src/main/app')
+    const app = new AppService(mkdtempSync(join(tmpdir(), 'opgg-app-')), () => undefined)
+    app.setSettings({ manualAccount: { gameName: 'Joueur', tagLine: 'EUW', region: 'EUW' }, region: 'EUW' })
+    const mu = await app.opgg.getMatchupBuild('Nasus', 'top', 'Darius')
+    console.log('MATCHUP runes', mu.runePages.map((p) => `${p.perkNames[0]} / ${p.subName} (${p.games} games, ${Math.round(p.winRate * 100)}%)`))
+    console.log('MATCHUP sorts', mu.spells.map((s) => `${s.names.join('+')} (${s.games})`), 'cores', mu.cores.map((c) => c.names.join(' > ')))
+    const t0 = Date.now()
+    const pro = await app.getProBuilds('Nasus', 'top', 'Darius')
+    console.log(`PRO ${pro.gamesAnalyzed} games de ${pro.players} joueurs en ${Date.now() - t0} ms`)
+    for (const v of pro.variants)
+      console.log(`  ${v.games} games (${v.wins}V, ${v.vsOpponent} vs Darius) keystone ${v.keystone} runes=${v.runes?.perkNames[0] ?? '?'} sorts ${v.spells} items ${v.items} bottes ${v.boots}`, v.examples.map((e) => `${e.player} ${e.win ? 'V' : 'D'} vs ${e.opponent}`))
+    expect(mu.runePages.length).toBeGreaterThan(0)
+    expect(pro.variants.length).toBeGreaterThan(0)
+  })
+})

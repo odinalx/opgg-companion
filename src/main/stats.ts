@@ -1,6 +1,7 @@
 // Agrégats de stats et fusion des historiques (OP.GG + client local).
 
-import type { DraftQueue, MatchSummary, Position, StatsAggregate } from '@shared/types'
+import type { DraftQueue, MatchSummary, Position, StatsAggregate, Tier, TierBenchmark } from '@shared/types'
+import { benchmark } from './benchmarks'
 import { POSITIONS } from '@shared/types'
 import { skillProfile } from './skills'
 
@@ -43,7 +44,7 @@ export function mergeMatches(existing: MatchSummary[], incoming: MatchSummary[])
 
 const kda = (k: number, d: number, a: number): number => (k + a) / Math.max(1, d)
 
-export function aggregate(matches: MatchSummary[]): StatsAggregate {
+export function aggregate(matches: MatchSummary[], tier: Tier = 'GOLD'): StatsAggregate {
   const games = matches.length
   const wins = matches.filter((m) => m.win).length
   const sum = (f: (m: MatchSummary) => number): number => matches.reduce((a, m) => a + f(m), 0)
@@ -95,10 +96,34 @@ export function aggregate(matches: MatchSummary[]): StatsAggregate {
     csPerMin: sum((m) => m.cs) / minutes,
     damagePerMin: sum((m) => m.damage) / minutes,
     visionPerGame: games ? sum((m) => m.wardsPlaced) / games : 0,
+    wardsPerMin: sum((m) => m.wardsPlaced + m.visionWards) / minutes,
+    goldPerMin: sum((m) => m.gold) / minutes,
+    deathsPer10: (sum((m) => m.deaths) / minutes) * 10,
     byChampion,
     byPosition,
     trend,
-    skills: skillProfile(matches)
+    skills: skillProfile(matches, tier),
+    tier,
+    tierBench: weightedBench(byPosition, tier)
+  }
+}
+
+/** Médianes du palier, moyennées selon la part de chaque rôle dans tes games. */
+function weightedBench(byPosition: Array<{ position: Position; games: number }>, tier: Tier): TierBenchmark | null {
+  const parts = byPosition.map((p) => ({ b: benchmark(tier, p.position), w: p.games })).filter((p) => p.b)
+  const total = parts.reduce((a, p) => a + p.w, 0)
+  if (!total) return null
+  const avg = (k: keyof TierBenchmark) => parts.reduce((a, p) => a + (p.b![k] as number) * p.w, 0) / total
+  return {
+    samples: parts.reduce((a, p) => a + p.b!.samples, 0),
+    csPerMin: avg('csPerMin'),
+    goldPerMin: avg('goldPerMin'),
+    damagePerMin: avg('damagePerMin'),
+    wardsPerMin: avg('wardsPerMin'),
+    deathsPer10: avg('deathsPer10'),
+    kda: avg('kda'),
+    killParticipation: avg('killParticipation'),
+    visionPerMin: avg('visionPerMin')
   }
 }
 

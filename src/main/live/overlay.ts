@@ -5,9 +5,10 @@
 import { BrowserWindow, globalShortcut, screen } from 'electron'
 import { request as httpRequest } from 'node:http'
 import { Agent, request } from 'node:https'
-import type { LiveStats, OverlaySettings, OverlayUi } from '@shared/types'
+import type { LiveStats, OverlaySettings, OverlayUi, Tier } from '@shared/types'
 import { loadStaticData } from '../ddragon'
-import { computeLiveStats } from './liveStats'
+import { isTabDown } from './keys'
+import { computeLiveStats, MILESTONES } from './liveStats'
 
 const LIVE_URL = process.env.LIVE_CLIENT_URL ?? 'https://127.0.0.1:2999'
 const localAgent = new Agent({ rejectUnauthorized: false })
@@ -40,7 +41,10 @@ function fetchLive(path: string): Promise<any> {
 export class OverlayManager {
   private win: BrowserWindow | null = null
   private timer: NodeJS.Timeout | null = null
-  private ui: OverlayUi = { visible: true, showBuild: false }
+  private ui: OverlayUi = { visible: true, showBuild: false, tabHeld: false }
+  private tabTimer: NodeJS.Timeout | null = null
+  /** CS au passage de chaque repère (10/15/20 min) de la partie en cours. */
+  private milestones = new Map<number, { cs: number; expected: number }>()
   private stats: LiveStats | null = null
   private misses = 0
   /** Fenêtre « second écran » fermée par l'utilisateur : on ne la rouvre pas avant la partie suivante. */
@@ -48,6 +52,7 @@ export class OverlayManager {
 
   constructor(
     private readonly getSettings: () => OverlaySettings,
+    private readonly getTier: () => Promise<Tier>,
     private readonly load: (win: BrowserWindow) => void,
     private readonly preload: string
   ) {}
@@ -55,10 +60,17 @@ export class OverlayManager {
   start(): void {
     this.applySettings()
     this.timer = setInterval(() => void this.tick(), POLL_MS)
+    // Tab maintenu (tableau des scores) : affiche l'écart d'or par lane. Lecture passive, 20 fois/s.
+    this.tabTimer = setInterval(() => {
+      if (!this.win || !this.stats || process.env.OPGG_CAPTURE_DIR) return
+      const held = isTabDown()
+      if (held !== this.ui.tabHeld) this.setUi({ tabHeld: held })
+    }, 50)
   }
 
   stop(): void {
     if (this.timer) clearInterval(this.timer)
+    if (this.tabTimer) clearInterval(this.tabTimer)
     globalShortcut.unregisterAll()
     this.win?.destroy()
   }
@@ -114,7 +126,14 @@ export class OverlayManager {
     try {
       const data = await fetchLive('/liveclientdata/allgamedata')
       await loadStaticData()
-      this.stats = computeLiveStats(data)
+      const stats = computeLiveStats(data, await this.getTier())
+      if (stats) {
+        for (const m of MILESTONES)
+          if (stats.gameTime >= m * 60 && !this.milestones.has(m) && stats.gameTime < m * 60 + 90 && stats.bench)
+            this.milestones.set(m, { cs: stats.cs, expected: Math.round(stats.csExpected) })
+        stats.milestones = [...this.milestones.entries()].map(([minute, v]) => ({ minute, ...v }))
+      }
+      this.stats = stats
       this.misses = 0
       if (this.stats && this.getSettings().enabled && !this.closedByUser) {
         this.ensureWindow()
@@ -124,6 +143,7 @@ export class OverlayManager {
       // Pas de partie en cours (ou écran de chargement) : on ferme l'overlay après quelques échecs.
       if (++this.misses === 5) {
         this.stats = null
+        this.milestones.clear()
         this.closedByUser = false
         this.hide()
       }
@@ -188,6 +208,6 @@ export class OverlayManager {
     const w = this.win
     this.win = null // avant destroy : ce n'est pas une fermeture par l'utilisateur
     w?.destroy()
-    this.ui = { visible: true, showBuild: false }
+    this.ui = { visible: true, showBuild: false, tabHeld: false }
   }
 }
