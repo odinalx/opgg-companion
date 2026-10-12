@@ -1,6 +1,6 @@
 {
   "name": "opgg-companion",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Compagnon League of Legends : profil, historique, stats et draft helper (données OP.GG MCP + client LoL)",
   "main": "./out/main/index.js",
   "author": "odinalx",
