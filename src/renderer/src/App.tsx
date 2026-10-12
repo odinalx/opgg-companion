@@ -51,7 +51,9 @@ export function App() {
                   onClick={() => setPage(n.page)}
                   aria-current={active ? 'page' : undefined}
                   className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[15px] font-semibold transition-colors ${
-                    active ? 'bg-panel-2 text-ink' : 'text-mute hover:bg-panel/70 hover:text-ink'
+                    active
+                      ? 'bg-white/[0.06] text-ink'
+                      : 'text-mute hover:bg-panel/70 hover:text-ink'
                   }`}
                 >
                   <span className={active ? 'text-accent' : ''}>

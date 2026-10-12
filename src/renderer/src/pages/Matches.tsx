@@ -122,7 +122,11 @@ function Select({
 function MatchRow({ match: m, open, onToggle }: { match: MatchSummary; open: boolean; onToggle: () => void }) {
   const mins = m.durationSec / 60 || 1
   const tone = m.remake ? 'mute' : m.win ? 'win' : 'loss'
-  const tint = { win: 'bg-win/[0.07] border-win/25', loss: 'bg-loss/[0.07] border-loss/25', mute: 'bg-panel border-line' }[tone]
+  const tint = {
+    win: 'bg-gradient-to-r from-win/[0.14] to-panel/60 border-win/30 shadow-[inset_3px_0_0_var(--color-win)]',
+    loss: 'bg-gradient-to-r from-loss/[0.12] to-panel/60 border-loss/25 shadow-[inset_3px_0_0_var(--color-loss)]',
+    mute: 'bg-panel border-line'
+  }[tone]
   const text = { win: 'text-win', loss: 'text-loss', mute: 'text-mute' }[tone]
   const showOpScore = m.opScore !== null && m.opScore > 0
   return (

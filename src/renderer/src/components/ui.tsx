@@ -26,7 +26,7 @@ export function Button({
   type?: 'button' | 'submit'
 }) {
   const styles = {
-    primary: 'bg-accent text-night hover:brightness-110 shadow-[0_6px_24px_-8px_rgb(47_212_196/0.5)]',
+    primary: 'bg-accent text-night hover:brightness-110 shadow-[0_0_24px_-4px_rgb(34_227_255/0.6)]',
     default: 'border border-line bg-panel-2 text-ink hover:bg-panel-3',
     ghost: 'text-soft hover:text-ink hover:bg-panel-2'
   }[variant]

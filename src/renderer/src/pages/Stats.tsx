@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { StatsAggregate, Tier } from '@shared/types'
 import { TIER_LABELS, TIERS } from '@shared/types'
 import { useApp } from '../store'
@@ -20,6 +20,7 @@ export function StatsPage() {
     window.api.getStats(account).then(setStats, () => setStats(null))
   }, [account, queueFilter, compareTier])
   const b = stats?.tierBench ?? undefined
+  const tl = stats ? TIER_LABELS[stats.tier] : ''
 
   return (
     <>
@@ -58,14 +59,14 @@ export function StatsPage() {
         </Empty>
       ) : (
         <div className="flex flex-col gap-6">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 2xl:grid-cols-7">
             <Tile label="Games" value={String(stats.games)} />
             <Tile label="Winrate" value={pct(stats.wins / stats.games)} tone={wrColor(stats.wins / stats.games)} />
-            <Tile label="KDA" value={stats.kda.toFixed(2)} you={stats.kda} median={b?.kda} />
-            <Tile label="CS par minute" value={stats.csPerMin.toFixed(1)} you={stats.csPerMin} median={b?.csPerMin} />
-            <Tile label="Dégâts par minute" value={Math.round(stats.damagePerMin).toLocaleString('fr-FR')} you={stats.damagePerMin} median={b?.damagePerMin} digits={0} />
-            <Tile label="Or par minute" value={Math.round(stats.goldPerMin).toLocaleString('fr-FR')} you={stats.goldPerMin} median={b?.goldPerMin} digits={0} />
-            <Tile label="Wards par minute" value={stats.wardsPerMin.toFixed(2)} you={stats.wardsPerMin} median={b?.wardsPerMin} digits={2} />
+            <Tile label="KDA" value={stats.kda.toFixed(2)} you={stats.kda} median={b?.kda} tierLabel={tl} />
+            <Tile label="CS par minute" value={stats.csPerMin.toFixed(1)} you={stats.csPerMin} median={b?.csPerMin} tierLabel={tl} />
+            <Tile label="Dégâts par minute" value={Math.round(stats.damagePerMin).toLocaleString('fr-FR')} you={stats.damagePerMin} median={b?.damagePerMin} digits={0} tierLabel={tl} />
+            <Tile label="Or par minute" value={Math.round(stats.goldPerMin).toLocaleString('fr-FR')} you={stats.goldPerMin} median={b?.goldPerMin} digits={0} tierLabel={tl} />
+            <Tile label="Wards par minute" value={stats.wardsPerMin.toFixed(2)} you={stats.wardsPerMin} median={b?.wardsPerMin} digits={2} tierLabel={tl} />
           </div>
 
           {stats.skills.length > 0 && (
@@ -83,7 +84,7 @@ export function StatsPage() {
             <p className="mb-3 text-sm text-mute">De la plus ancienne à la plus récente des {stats.games} games.</p>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={stats.trend.map((t, i) => ({ ...t, n: i + 1 }))} margin={{ top: 8, right: 16, bottom: 0, left: -8 }}>
+                <AreaChart data={stats.trend.map((t, i) => ({ ...t, n: i + 1 }))} margin={{ top: 8, right: 16, bottom: 0, left: -8 }}>
                   <CartesianGrid stroke="#24324b" strokeDasharray="0" vertical={false} />
                   <XAxis dataKey="n" stroke="#8d99b0" tickLine={false} axisLine={false} fontSize={12} />
                   <YAxis
@@ -105,8 +106,23 @@ export function StatsPage() {
                       'Winrate cumulé'
                     ]}
                   />
-                  <Line type="monotone" dataKey="cumulativeWr" stroke="var(--color-accent)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                </LineChart>
+                  <defs>
+                    <linearGradient id="wr-fill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--color-accent)" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="var(--color-accent)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Area
+                    type="monotone"
+                    dataKey="cumulativeWr"
+                    stroke="var(--color-accent)"
+                    strokeWidth={2}
+                    fill="url(#wr-fill)"
+                    dot={false}
+                    activeDot={{ r: 5, fill: 'var(--color-accent)', stroke: 'var(--color-panel)', strokeWidth: 2 }}
+                    style={{ filter: 'drop-shadow(0 0 6px rgb(34 227 255 / 0.6))' }}
+                  />
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           </section>
@@ -173,7 +189,7 @@ function Tile({
   you,
   median,
   digits = 1,
-  lowerIsBetter
+  tierLabel
 }: {
   label: string
   value: string
@@ -181,18 +197,30 @@ function Tile({
   you?: number
   median?: number
   digits?: number
-  lowerIsBetter?: boolean
+  tierLabel?: string
 }) {
-  const better = you !== undefined && median !== undefined ? (lowerIsBetter ? you <= median : you >= median) : null
+  const hasMedian = you !== undefined && median !== undefined && median > 0
+  // Jauge : la médiane est au milieu ; le double de la médiane remplit la jauge.
+  const ratio = hasMedian ? Math.min(1, you! / (median! * 2)) : 0
+  const better = hasMedian && you! >= median!
   return (
     <div className="card px-5 py-4">
       <p className="text-sm text-mute">{label}</p>
-      <p className={`num mt-1 text-4xl leading-none font-bold ${tone}`}>{value}</p>
-      {median !== undefined && (
-        <p className="mt-1.5 text-xs text-mute">
-          médiane <span className="num text-sm text-soft">{median.toFixed(digits)}</span>{' '}
-          <span className={better ? 'text-ok' : 'text-loss'}>{better ? '▲' : '▼'}</span>
-        </p>
+      <p className={`num glow mt-1 text-4xl leading-none font-bold ${tone || (hasMedian ? (better ? 'text-accent' : 'text-ink') : '')}`}>{value}</p>
+      {hasMedian && (
+        <div className="mt-3">
+          <div className="relative h-1.5 rounded-full bg-white/[0.06]">
+            <div className="neon-fill absolute inset-y-0 left-0 rounded-full" style={{ width: `${ratio * 100}%` }} />
+            <span className="absolute -top-1 left-1/2 h-3.5 w-px bg-white/70" title="médiane" />
+          </div>
+          <p className="mt-1.5 text-xs text-mute">
+            médiane {tierLabel} <span className="num text-sm text-soft">{median!.toFixed(digits)}</span>{' '}
+            <span className={better ? 'text-ok' : 'text-loss'}>
+              {better ? '+' : '−'}
+              {Math.abs(((you! - median!) / median!) * 100).toFixed(0)} %
+            </span>
+          </p>
+        </div>
       )}
     </div>
   )

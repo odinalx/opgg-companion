@@ -406,7 +406,7 @@ function TopPick({
   onBuild: () => void
 }) {
   return (
-    <article className="hero">
+    <article className="hero neon-border">
       <Splash name={s.champion} />
       <div className="flex min-h-[300px] flex-col justify-end gap-5 p-7">
         <div className="flex items-end justify-between gap-6">
@@ -422,7 +422,7 @@ function TopPick({
             </div>
           </div>
           <div className="shrink-0 text-right">
-            <p className="num text-8xl leading-[0.8] font-bold text-accent">{Math.round(s.score)}</p>
+            <p className="num glow text-8xl leading-[0.8] font-bold text-accent">{Math.round(s.score)}</p>
             <p className="mt-2 text-sm text-soft">score sur 100</p>
           </div>
         </div>

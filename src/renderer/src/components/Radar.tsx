@@ -29,6 +29,19 @@ export function SkillRadar({ axes }: { axes: SkillAxis[] }) {
   return (
     <div className="grid grid-cols-1 items-center gap-6 lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]">
       <svg viewBox={`-60 0 ${SIZE + 120} ${SIZE}`} className="w-full max-w-[30rem]" role="img" aria-label="Radar des domaines de jeu, détaillé dans le tableau voisin">
+        <defs>
+          <filter id="radar-glow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <radialGradient id="radar-fill">
+            <stop offset="0%" stopColor="var(--color-accent)" stopOpacity="0.32" />
+            <stop offset="100%" stopColor="var(--color-accent)" stopOpacity="0.22" />
+          </radialGradient>
+        </defs>
         {/* Grille : anneaux hexagonaux 25/50/75/100 et rayons */}
         {[25, 50, 75, 100].map((ring) => (
           <polygon
@@ -46,20 +59,23 @@ export function SkillRadar({ axes }: { axes: SkillAxis[] }) {
         })}
 
         {/* Moyenne de toutes les games */}
+        {/* Avec la forme récente, la moyenne passe en retrait (neutre) ; seule, elle prend le style néon. */}
         <polygon
           points={polygon(axes.map((a) => a.overall))}
-          fill="rgb(195 203 218 / 0.10)"
-          stroke="#c3cbda"
+          fill={hasRecent ? 'rgb(195 203 218 / 0.10)' : 'url(#radar-fill)'}
+          stroke={hasRecent ? '#c3cbda' : 'var(--color-accent)'}
           strokeWidth={2}
           strokeLinejoin="round"
+          filter={hasRecent ? undefined : 'url(#radar-glow)'}
         />
         {/* Forme récente */}
         {hasRecent && (
           <polygon
             points={polygon(axes.map((a) => a.recent!))}
-            fill="rgb(47 212 196 / 0.18)"
+            fill="url(#radar-fill)"
             stroke="var(--color-accent)"
             strokeWidth={2}
+            filter="url(#radar-glow)"
             strokeLinejoin="round"
           />
         )}
@@ -75,7 +91,7 @@ export function SkillRadar({ axes }: { axes: SkillAxis[] }) {
                 cx={x}
                 cy={y}
                 r={hover === i ? 6 : 4.5}
-                fill={hasRecent ? 'var(--color-accent)' : '#c3cbda'}
+                fill="var(--color-accent)"
                 stroke="var(--color-panel)"
                 strokeWidth={2}
               />
@@ -111,7 +127,7 @@ export function SkillRadar({ axes }: { axes: SkillAxis[] }) {
             </li>
           )}
           <li className="flex items-center gap-2">
-            <span className="h-0.5 w-5 rounded bg-soft" /> Toutes les games
+            <span className={`h-0.5 w-5 rounded ${hasRecent ? 'bg-soft' : 'bg-accent'}`} /> Toutes les games
           </li>
           <li className="flex items-center gap-2 text-mute">
             <span className="w-5 border-t border-dashed border-mute" /> Médiane de ton palier (50)

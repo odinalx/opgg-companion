@@ -118,25 +118,45 @@ function RankCard({ entry: r, primary }: { entry: RankedEntry; primary?: boolean
   const games = r.wins + r.losses
   const wr = games ? r.wins / games : 0
   return (
-    <section className="card flex items-center gap-5 p-5">
-      {r.emblemUrl && (
-        <img src={r.emblemUrl} alt="" className={primary ? 'h-24 w-24' : 'h-16 w-16 opacity-90'} />
-      )}
+    <section className={`card flex items-center gap-5 p-5 ${primary ? 'neon-border' : ''}`}>
+      {r.emblemUrl && <img src={r.emblemUrl} alt="" className={primary ? 'h-24 w-24 drop-shadow-[0_0_18px_rgb(34_227_255/0.25)]' : 'h-16 w-16 opacity-90'} />}
       <div className="min-w-0 flex-1">
         <p className="text-sm text-mute">{queueLabel(r.queue)}</p>
         <p className={`num leading-tight font-bold ${primary ? 'text-4xl' : 'text-2xl'}`}>{tierLabel(r.tier, r.division, null)}</p>
-        {r.lp !== null && r.tier && <p className="num text-xl text-accent">{r.lp} LP</p>}
+        {r.lp !== null && r.tier && <p className="num glow text-xl text-accent">{r.lp} LP</p>}
       </div>
-      {games > 0 && (
-        <div className="text-right">
-          <p className={`num text-3xl font-bold ${wr >= 0.5 ? 'text-win' : 'text-loss'}`}>{Math.round(wr * 100)}%</p>
-          <p className="text-sm text-mute">
-            {r.wins}V · {r.losses}D
-          </p>
-          {r.hotStreak && <p className="mt-1 text-xs font-semibold text-accent">Série de victoires</p>}
-        </div>
-      )}
+      {games > 0 && <WinrateRing wr={wr} wins={r.wins} losses={r.losses} size={primary ? 96 : 72} hot={r.hotStreak} />}
     </section>
+  )
+}
+
+/** Anneau de winrate : bleu pour les victoires, rouge pour les défaites, pourcentage au centre. */
+function WinrateRing({ wr, wins, losses, size, hot }: { wr: number; wins: number; losses: number; size: number; hot: boolean }) {
+  const r = size / 2 - 6
+  const c = 2 * Math.PI * r
+  return (
+    <div className="flex flex-col items-center" title={`${wins} victoires, ${losses} défaites`}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--color-loss)" strokeOpacity={0.55} strokeWidth={6} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke="var(--color-win)"
+          strokeWidth={6}
+          strokeLinecap="round"
+          strokeDasharray={`${c * wr} ${c}`}
+          style={{ filter: 'drop-shadow(0 0 5px rgb(79 157 255 / 0.8))' }}
+        />
+        <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle" transform={`rotate(90 ${size / 2} ${size / 2})`} className="num fill-ink text-[22px] font-bold">
+          {Math.round(wr * 100)}%
+        </text>
+      </svg>
+      <p className="mt-1 text-xs text-mute">
+        {wins}V · {losses}D{hot ? ' · série' : ''}
+      </p>
+    </div>
   )
 }
 
@@ -156,7 +176,7 @@ function RecentForm({ matches, onOpen }: { matches: MatchSummary[]; onOpen: () =
       </div>
       <div className="mt-3 flex items-end gap-8">
         <div>
-          <p className="num text-4xl font-bold">
+          <p className="num glow text-4xl font-bold">
             <span className="text-win">{wins}</span>
             <span className="text-mute"> – </span>
             <span className="text-loss">{matches.length - wins}</span>
