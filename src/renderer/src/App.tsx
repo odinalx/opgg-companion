@@ -9,6 +9,7 @@ import { MatchesPage } from './pages/Matches'
 import { StatsPage } from './pages/Stats'
 import { DraftPage } from './pages/Draft'
 import { SettingsPage } from './pages/Settings'
+import logo from './logo.svg'
 
 const NAV: Array<{ page: Page; label: string }> = [
   { page: 'profile', label: 'Profil' },
@@ -33,7 +34,7 @@ export function App() {
     <div className="flex h-full">
       <nav className="flex w-60 shrink-0 flex-col border-r border-line bg-night/70 px-4 py-6 backdrop-blur" aria-label="Navigation">
         <div className="mb-9 flex items-center gap-3 px-2">
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent font-display text-xl font-bold text-night">OC</span>
+          <img src={logo} alt="" className="h-10 w-10" />
           <div className="leading-tight">
             <p className="font-display text-lg font-bold">OPGG Companion</p>
             <p className="text-xs text-mute">League of Legends</p>
