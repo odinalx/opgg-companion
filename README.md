@@ -11,8 +11,8 @@ Données : [OP.GG MCP](https://github.com/opgginc/opgg-mcp), le client LoL insta
 
 Va dans [**Releases**](https://github.com/odinalx/opgg-companion/releases/latest) et prends :
 
-- `OPGG Companion-Setup-x.y.z.exe` : installeur ;
-- ou `OPGG Companion-Portable-x.y.z.exe` : version portable, sans installation.
+- `OPGG-Companion-Setup-x.y.z.exe` : installeur ;
+- ou `OPGG-Companion-Portable-x.y.z.exe` : version portable, sans installation.
 
 Les exécutables ne sont pas signés : au premier lancement, Windows SmartScreen affiche « Windows a protégé votre ordinateur ».
 Clique sur **Informations complémentaires → Exécuter quand même**.
