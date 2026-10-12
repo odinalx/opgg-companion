@@ -18,6 +18,8 @@ const methods: ApiMethod[] = [
   'openExternal',
   'getBuild',
   'importBuild',
+  'getOverlayState',
+  'getDisplays',
   'launchRiotClient',
   'signOut'
 ]
@@ -38,5 +40,8 @@ contextBridge.exposeInMainWorld('api', {
   onClientStatus: (cb) => subscribe('client:status', cb),
   onLiveDraft: (cb) => subscribe('draft:live', cb),
   onTrainProgress: (cb) => subscribe('model:progress', cb),
-  onAutoImport: (cb) => subscribe('build:auto-imported', cb)
+  onAutoImport: (cb) => subscribe('build:auto-imported', cb),
+  onOverlayStats: (cb) => subscribe('overlay:stats', cb),
+  onOverlayUi: (cb) => subscribe('overlay:ui', cb),
+  onOverlaySettings: (cb) => subscribe('overlay:settings', cb)
 } satisfies Api)

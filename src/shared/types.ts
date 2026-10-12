@@ -186,6 +186,7 @@ export interface Settings {
   candidatePool: 'owned' | 'played' | 'all'
   /** Importe runes + sorts dans le client dès que le champion est locké. */
   autoImport: boolean
+  overlay: OverlaySettings
 }
 
 export const DEFAULT_WEIGHTS: DraftWeights = {
@@ -203,7 +204,16 @@ export const DEFAULT_SETTINGS: Settings = {
   useModel: false,
   queueFilter: 'ranked',
   candidatePool: 'played',
-  autoImport: false
+  autoImport: false,
+  overlay: {
+    enabled: true,
+    mode: 'overlay',
+    displayId: null,
+    metrics: { cs: true, gold: true, kda: true, kp: true, vision: false },
+    corner: 'top-right',
+    toggleKey: 'Control+Shift+H',
+    buildKey: 'Control+Shift+B'
+  }
 }
 
 export interface StatsAggregate {
@@ -272,4 +282,62 @@ export interface ImportResult {
   spells?: string
   items?: string
   errors: string[]
+}
+
+// ---------- Overlay en jeu ----------
+
+export type OverlayMetric = 'cs' | 'gold' | 'kda' | 'kp' | 'vision'
+export const OVERLAY_METRICS: OverlayMetric[] = ['cs', 'gold', 'kda', 'kp', 'vision']
+
+export interface OverlaySettings {
+  enabled: boolean
+  /** overlay : par-dessus le jeu ; window : fenêtre classique, typiquement sur un second écran. */
+  mode: 'overlay' | 'window'
+  displayId: number | null // écran de la fenêtre (null = écran principal)
+  metrics: Record<OverlayMetric, boolean>
+  corner: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+  toggleKey: string // raccourci global (format Electron), ex. "Control+Shift+H"
+  buildKey: string
+}
+
+export const DEFAULT_OVERLAY: OverlaySettings = {
+  enabled: true,
+  mode: 'overlay',
+  displayId: null,
+  metrics: { cs: true, gold: true, kda: true, kp: true, vision: false },
+  corner: 'top-right',
+  toggleKey: 'Control+Shift+H',
+  buildKey: 'Control+Shift+B'
+}
+
+/** Stats du joueur pendant la partie (Live Client Data API). */
+export interface LiveStats {
+  champion: string
+  position: Position | null
+  gameTime: number // secondes
+  level: number
+  cs: number
+  csPerMin: number
+  csTarget: number // repère « bon niveau » pour le rôle
+  kills: number
+  deaths: number
+  assists: number
+  killParticipation: number
+  vision: number
+  currentGold: number
+  goldEarned: number // estimé : valeur des items + or en poche
+  goldPerMin: number
+}
+
+export interface OverlayUi {
+  visible: boolean
+  showBuild: boolean
+}
+
+export interface DisplayInfo {
+  id: number
+  label: string
+  primary: boolean
+  width: number
+  height: number
 }

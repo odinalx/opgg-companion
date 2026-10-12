@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { ModelInfo, Region } from '@shared/types'
-import { CRITERIA, REGIONS } from '@shared/types'
+import type { DisplayInfo, ModelInfo, OverlayMetric, OverlaySettings, Region } from '@shared/types'
+import { CRITERIA, OVERLAY_METRICS, REGIONS } from '@shared/types'
 import { useApp } from '../store'
 import { Button, Notice, PageHeader } from '../components/ui'
 import { pct } from '../lib/format'
@@ -115,6 +115,8 @@ export function SettingsPage() {
           </label>
         </section>
 
+        <OverlaySection />
+
         <ModelSection useModel={s.useModel} onToggle={(v) => void updateSettings({ useModel: v })} />
 
         <section className="text-sm text-mute">
@@ -211,5 +213,131 @@ function ModelSection({ useModel, onToggle }: { useModel: boolean; onToggle: (v:
         </div>
       )}
     </section>
+  )
+}
+
+const METRIC_LABELS: Record<OverlayMetric, string> = {
+  cs: 'CS et CS/min (comparé au repère de ton rôle)',
+  gold: 'Or estimé par minute',
+  kda: 'KDA',
+  kp: 'Participation aux kills',
+  vision: 'Score de vision'
+}
+
+const CORNERS: Array<{ value: OverlaySettings['corner']; label: string }> = [
+  { value: 'top-left', label: 'En haut à gauche' },
+  { value: 'top-right', label: 'En haut à droite' },
+  { value: 'bottom-left', label: 'En bas à gauche' },
+  { value: 'bottom-right', label: 'En bas à droite' }
+]
+
+function OverlaySection() {
+  const { settings, updateSettings } = useApp()
+  const o = settings!.overlay
+  const set = (patch: Partial<OverlaySettings>): void => void updateSettings({ overlay: { ...o, ...patch } })
+  const [displays, setDisplays] = useState<DisplayInfo[]>([])
+  useEffect(() => void window.api.getDisplays().then(setDisplays), [])
+
+  return (
+    <section>
+      <h2 className="font-display text-2xl font-bold">Overlay en jeu</h2>
+      <p className="mt-1 text-sm text-soft">
+        Tes stats et le build OP.GG pendant la partie, par-dessus le jeu ou dans une fenêtre sur un autre écran. L'overlay
+        demande LoL en mode d'affichage « Sans bordure » (en plein écran, Windows le masque) ; la fenêtre séparée marche
+        dans tous les modes. Les dégâts par minute ne sont pas fournis par le jeu pendant la partie.
+      </p>
+      <label className="mt-3 flex items-center gap-2 text-sm font-semibold">
+        <input
+          type="checkbox"
+          checked={o.enabled}
+          onChange={(e) => set({ enabled: e.target.checked })}
+          className="h-4 w-4 accent-[var(--color-accent)]"
+        />
+        Activer l'overlay
+      </label>
+      <fieldset disabled={!o.enabled} className="mt-4 grid grid-cols-1 gap-5 disabled:opacity-50 sm:grid-cols-2">
+        <div>
+          <legend className="mb-2 text-sm text-mute">Stats affichées</legend>
+          {OVERLAY_METRICS.map((m) => (
+            <label key={m} className="flex items-center gap-2 py-0.5 text-sm">
+              <input
+                type="checkbox"
+                checked={o.metrics[m]}
+                onChange={(e) => set({ metrics: { ...o.metrics, [m]: e.target.checked } })}
+                className="h-4 w-4 accent-[var(--color-accent)]"
+              />
+              {METRIC_LABELS[m]}
+            </label>
+          ))}
+        </div>
+        <div className="flex flex-col gap-3">
+          <label className="text-sm">
+            <span className="mb-1 block text-mute">Affichage pendant la partie</span>
+            <select value={o.mode} onChange={(e) => set({ mode: e.target.value as OverlaySettings['mode'] })} className="field w-full px-2.5 py-2">
+              <option value="overlay">Overlay par-dessus le jeu</option>
+              <option value="window">Fenêtre séparée (second écran)</option>
+            </select>
+          </label>
+          {o.mode === 'window' && (
+            <label className="text-sm">
+              <span className="mb-1 block text-mute">Écran</span>
+              <select
+                value={o.displayId ?? ''}
+                onChange={(e) => set({ displayId: e.target.value ? Number(e.target.value) : null })}
+                className="field w-full px-2.5 py-2"
+              >
+                <option value="">Écran principal</option>
+                {displays.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.label} ({d.width}×{d.height}){d.primary ? ' · principal' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {o.mode === 'overlay' && (
+          <label className="text-sm">
+            <span className="mb-1 block text-mute">Position</span>
+            <select value={o.corner} onChange={(e) => set({ corner: e.target.value as OverlaySettings['corner'] })} className="field w-full px-2.5 py-2">
+              {CORNERS.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          )}
+          <HotkeyInput label="Afficher / masquer l'overlay" value={o.toggleKey} onChange={(toggleKey) => set({ toggleKey })} />
+          <HotkeyInput label="Afficher le build" value={o.buildKey} onChange={(buildKey) => set({ buildKey })} />
+        </div>
+      </fieldset>
+    </section>
+  )
+}
+
+/** Champ qui enregistre la combinaison de touches pressée (format des raccourcis Electron). */
+function HotkeyInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const [recording, setRecording] = useState(false)
+  return (
+    <label className="text-sm">
+      <span className="mb-1 block text-mute">{label}</span>
+      <input
+        readOnly
+        value={recording ? 'Appuie sur la combinaison…' : value.replace('Control', 'Ctrl').replaceAll('+', ' + ')}
+        onFocus={() => setRecording(true)}
+        onBlur={() => setRecording(false)}
+        onKeyDown={(e) => {
+          e.preventDefault()
+          if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return
+          if (e.key === 'Escape') return (e.target as HTMLInputElement).blur()
+          const mods = [e.ctrlKey && 'Control', e.altKey && 'Alt', e.shiftKey && 'Shift'].filter(Boolean)
+          if (!mods.length) return // un raccourci global sans modificateur gênerait la partie
+          const key = e.code.startsWith('Key') ? e.code.slice(3) : e.code.startsWith('Digit') ? e.code.slice(5) : e.key.length === 1 ? e.key.toUpperCase() : e.key
+          onChange([...mods, key].join('+'))
+          ;(e.target as HTMLInputElement).blur()
+        }}
+        className="field w-full cursor-pointer px-3 py-2"
+      />
+    </label>
   )
 }

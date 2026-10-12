@@ -1,0 +1,37 @@
+import { describe, expect, it } from 'vitest'
+import { setChampions } from '../ddragon'
+import { computeLiveStats } from './liveStats'
+
+describe('computeLiveStats', () => {
+  it('calcule CS/min, participation et or estimé', () => {
+    setChampions([{ id: 62, key: 'MonkeyKing', name: 'Wukong' }])
+    const s = computeLiveStats({
+      activePlayer: { riotId: 'Joueur#EUW', currentGold: 500.7, level: 9 },
+      allPlayers: [
+        {
+          riotId: 'Joueur#EUW',
+          championName: 'Wukong (localisé)',
+          rawChampionName: 'game_character_displayname_MonkeyKing',
+          team: 'ORDER',
+          position: 'JUNGLE',
+          level: 9,
+          items: [{ itemID: 1, price: 1000, count: 1 }, { itemID: 2, price: 50, count: 2 }],
+          scores: { creepScore: 90, kills: 3, deaths: 1, assists: 4, wardScore: 12.4 }
+        },
+        { riotId: 'ally#1', team: 'ORDER', scores: { kills: 7 } },
+        { riotId: 'enemy#1', team: 'CHAOS', scores: { kills: 20 } }
+      ],
+      gameData: { gameTime: 900 }
+    })!
+    expect(s.champion).toBe('Wukong')
+    expect(s.position).toBe('jungle')
+    expect(s.csPerMin).toBe(6)
+    expect(s.killParticipation).toBe(0.7)
+    expect(s.goldEarned).toBe(1600)
+    expect(s.vision).toBe(12)
+  })
+
+  it('renvoie null hors partie', () => {
+    expect(computeLiveStats({})).toBeNull()
+  })
+})

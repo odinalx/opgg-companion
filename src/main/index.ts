@@ -1,9 +1,10 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, screen, shell } from 'electron'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Api, ApiMethod } from '@shared/api'
 import { AppService } from './app'
 import { launchRiotClient } from './lcu/launcher'
+import { OverlayManager } from './live/overlay'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 let win: BrowserWindow | null = null
@@ -12,12 +13,27 @@ const service = new AppService(join(app.getPath('userData'), 'data'), (channel, 
   win?.webContents.send(channel, payload)
 )
 
+function loadRenderer(w: BrowserWindow, query = ''): void {
+  if (process.env.ELECTRON_RENDERER_URL) void w.loadURL(process.env.ELECTRON_RENDERER_URL + query)
+  else void w.loadFile(join(here, '../renderer/index.html'), query ? { search: query.slice(1) } : undefined)
+}
+
+const overlay = new OverlayManager(
+  () => service.getSettings().overlay,
+  (w) => loadRenderer(w, '?overlay=1'),
+  join(here, '../preload/index.cjs')
+)
+
 // Chaque méthode de l'API renderer correspond à un handler IPC du même nom.
 const handlers: { [K in ApiMethod]: (...args: Parameters<Api[K]>) => ReturnType<Api[K]> | Awaited<ReturnType<Api[K]>> } = {
   getStatic: () => service.getStatic(),
   getClientStatus: () => service.getClientStatus(),
   getSettings: () => service.getSettings(),
-  setSettings: (patch) => service.setSettings(patch),
+  setSettings: (patch) => {
+    const next = service.setSettings(patch)
+    if (patch.overlay) overlay.applySettings()
+    return next
+  },
   currentAccount: () => service.currentAccount(),
   getProfile: (acc) => service.getProfile(acc),
   getMatches: (acc, refresh) => service.getMatches(acc, refresh),
@@ -29,6 +45,17 @@ const handlers: { [K in ApiMethod]: (...args: Parameters<Api[K]>) => ReturnType<
   trainModel: () => service.trainModel((done, total) => win?.webContents.send('model:progress', { done, total })),
   getBuild: (champion, position) => service.opgg.getBuild(champion, position),
   importBuild: (champion, position, parts) => service.importBuild(champion, position, parts),
+  getOverlayState: () => ({ stats: overlay.getStats(), ui: overlay.getUi(), settings: service.getSettings().overlay }),
+  getDisplays: () => {
+    const primary = screen.getPrimaryDisplay().id
+    return screen.getAllDisplays().map((d, i) => ({
+      id: d.id,
+      label: d.label || `Écran ${i + 1}`,
+      primary: d.id === primary,
+      width: d.size.width,
+      height: d.size.height
+    }))
+  },
   launchRiotClient: async () => launchRiotClient(),
   signOut: async () => void service.setSettings({ manualAccount: null }),
   openExternal: async (url) => {
@@ -56,9 +83,11 @@ function createWindow(): void {
     if (/^https:\/\//.test(url)) void shell.openExternal(url)
     return { action: 'deny' }
   })
-  if (process.env.ELECTRON_RENDERER_URL) void win.loadURL(process.env.ELECTRON_RENDERER_URL)
-  else void win.loadFile(join(here, '../renderer/index.html'))
-  win.on('closed', () => (win = null))
+  loadRenderer(win)
+  win.on('closed', () => {
+    win = null
+    app.quit() // l'overlay seul n'a pas de sens : fermer la fenêtre principale quitte l'app
+  })
   if (process.env.OPGG_CAPTURE_DIR) void captureAllPages(win, process.env.OPGG_CAPTURE_DIR)
 }
 
@@ -82,6 +111,16 @@ async function captureAllPages(w: BrowserWindow, dir: string): Promise<void> {
     )
     await wait(6000)
     writeFileSync(join(dir, 'draft-click.png'), (await w.webContents.capturePage()).toPNG())
+  }
+  // OPGG_CAPTURE_OVERLAY=1 : capture l'overlay (HUD puis build) pendant une partie simulée.
+  if (process.env.OPGG_CAPTURE_OVERLAY) {
+    const ow = overlay.getWindow()
+    if (ow) {
+      writeFileSync(join(dir, 'overlay-hud.png'), (await ow.webContents.capturePage()).toPNG())
+      overlay.setUi({ showBuild: true })
+      await wait(5000)
+      writeFileSync(join(dir, 'overlay-build.png'), (await ow.webContents.capturePage()).toPNG())
+    } else writeFileSync(join(dir, 'overlay-missing.txt'), 'aucune partie détectée')
   }
   // OPGG_CAPTURE_SIM="jungle|Ahri,Garen|Vi,Jinx,Darius" : simulation de draft (rôle|alliés|ennemis).
   const sim = process.env.OPGG_CAPTURE_SIM
@@ -109,11 +148,12 @@ app.whenReady().then(() => {
   for (const [name, fn] of Object.entries(handlers))
     ipcMain.handle(name, (_e, ...args: unknown[]) => (fn as (...a: unknown[]) => unknown)(...args))
   service.start()
+  overlay.start()
   createWindow()
   app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow())
 })
 
-app.on('window-all-closed', () => {
+app.on('before-quit', () => {
+  overlay.stop()
   service.shutdown()
-  app.quit()
 })

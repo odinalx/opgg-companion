@@ -167,3 +167,42 @@ server.listen(0, '127.0.0.1', () => {
   console.log(`Faux client LoL sur le port ${port} (compte ${ACCOUNT.gameName}#${ACCOUNT.tagLine}, ${ACCOUNT.region})`)
   console.log(`Lance l'app avec : LCU_LOCKFILE=${lockfile} npm run dev`)
 })
+
+// Partie en cours simulée (Live Client Data API) : MOCK_INGAME=1.
+// Lancer l'app avec LIVE_CLIENT_URL=<url affichée>.
+if (process.env.MOCK_INGAME) {
+  const start = Date.now()
+  const champ = process.env.MOCK_PICK ?? 'Nasus'
+  const key = Object.values(champs.data).find((c) => c.name === champ)?.id ?? champ
+  const live = createServer((req, res) => {
+    const t = 840 + (Date.now() - start) / 1000 // la partie commence à 14:00
+    const min = t / 60
+    const me = {
+      riotId: `${ACCOUNT.gameName}#${ACCOUNT.tagLine}`,
+      riotIdGameName: ACCOUNT.gameName,
+      championName: champ,
+      rawChampionName: `game_character_displayname_${key}`,
+      team: 'ORDER',
+      position: 'TOP',
+      level: Math.min(18, Math.floor(min / 1.4) + 1),
+      items: [
+        { itemID: 3078, price: 3333, count: 1 },
+        { itemID: 3047, price: 1200, count: 1 },
+        { itemID: 1054, price: 450, count: 1 }
+      ],
+      scores: { creepScore: Math.round(min * 7.1), kills: 4, deaths: 2, assists: 5, wardScore: min * 0.9 }
+    }
+    const others = [
+      { riotId: 'Allié#1', team: 'ORDER', scores: { kills: 9 } },
+      { riotId: 'Ennemi#1', team: 'CHAOS', scores: { kills: 11 } }
+    ]
+    res.writeHead(200, { 'Content-Type': 'application/json' }).end(
+      JSON.stringify({
+        activePlayer: { riotId: me.riotId, riotIdGameName: ACCOUNT.gameName, currentGold: 740, level: me.level },
+        allPlayers: [me, ...others],
+        gameData: { gameMode: 'CLASSIC', gameTime: t, mapNumber: 11 }
+      })
+    )
+  })
+  live.listen(0, '127.0.0.1', () => console.log(`Partie simulée : LIVE_CLIENT_URL=http://127.0.0.1:${live.address().port}`))
+}

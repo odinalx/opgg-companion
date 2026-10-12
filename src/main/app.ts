@@ -48,7 +48,12 @@ export class AppService {
     this.settings.set({
       ...DEFAULT_SETTINGS,
       ...this.settings.get(),
-      weights: { ...DEFAULT_SETTINGS.weights, ...this.settings.get().weights }
+      weights: { ...DEFAULT_SETTINGS.weights, ...this.settings.get().weights },
+      overlay: {
+        ...DEFAULT_SETTINGS.overlay,
+        ...this.settings.get().overlay,
+        metrics: { ...DEFAULT_SETTINGS.overlay.metrics, ...this.settings.get().overlay?.metrics }
+      }
     })
     this.matches = new JsonFile(dataPath(dataDir, 'matches.json'), {})
     this.models = new JsonFile(dataPath(dataDir, 'models.json'), {})

@@ -15,7 +15,11 @@ import type {
   ChampionInfo,
   ChampionBuild,
   ImportResult,
-  Position
+  Position,
+  LiveStats,
+  OverlaySettings,
+  OverlayUi,
+  DisplayInfo
 } from './types'
 
 export interface StaticDataDto {
@@ -50,12 +54,17 @@ export interface Api {
   openExternal(url: string): Promise<void>
   getBuild(champion: string, position: Position): Promise<ChampionBuild>
   importBuild(champion: string, position: Position, parts: { runes?: boolean; spells?: boolean; items?: boolean }): Promise<ImportResult>
+  getOverlayState(): Promise<{ stats: LiveStats | null; ui: OverlayUi; settings: OverlaySettings }>
+  getDisplays(): Promise<DisplayInfo[]>
   launchRiotClient(): Promise<void>
   signOut(): Promise<void>
   onClientStatus(cb: (s: ClientStatus) => void): () => void
   onLiveDraft(cb: (d: DraftState | null) => void): () => void
   onTrainProgress(cb: (p: { done: number; total: number }) => void): () => void
   onAutoImport(cb: (r: ImportResult & { champion: string }) => void): () => void
+  onOverlayStats(cb: (s: LiveStats) => void): () => void
+  onOverlayUi(cb: (ui: OverlayUi) => void): () => void
+  onOverlaySettings(cb: (s: OverlaySettings) => void): () => void
 }
 
-export type ApiMethod = Exclude<keyof Api, 'onClientStatus' | 'onLiveDraft' | 'onTrainProgress' | 'onAutoImport'>
+export type ApiMethod = Exclude<keyof Api, `on${string}`>

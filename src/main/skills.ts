@@ -43,6 +43,15 @@ const BENCHMARKS: Record<Position, RoleBenchmarks> = {
   }
 }
 
+/** CS/min d'un « bon niveau » (≈ top 10 %) par rôle, utilisé par l'overlay. */
+export const CS_TARGET: Record<Position, number> = {
+  top: BENCHMARKS.top.farm.high,
+  jungle: BENCHMARKS.jungle.farm.high,
+  mid: BENCHMARKS.mid.farm.high,
+  adc: BENCHMARKS.adc.farm.high,
+  support: BENCHMARKS.support.farm.high
+}
+
 const AXES: Array<{ key: SkillKey; label: string; unit: string; value: (m: MatchSummary, min: number) => number }> = [
   { key: 'combat', label: 'Combat', unit: 'KDA', value: (m) => (m.kills + m.assists) / Math.max(1, m.deaths) },
   { key: 'farm', label: 'Farm', unit: 'CS/min', value: (m, min) => m.cs / min },
