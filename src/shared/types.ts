@@ -144,7 +144,11 @@ export interface DraftSlot {
   position: Position | null
 }
 
+/** File de la partie : détermine quelles games perso comptent dans le draft helper. */
+export type DraftQueue = 'solo' | 'flex' | 'other'
+
 export interface DraftState {
+  queue: DraftQueue
   myPosition: Position | null
   allies: DraftSlot[] // sans le joueur local
   enemies: DraftSlot[]

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MatchSummary } from '@shared/types'
-import { aggregate, mergeMatches, personalRecord } from './stats'
+import { aggregate, matchesForDraft, mergeMatches, personalRecord } from './stats'
 import { assignPositions } from './draft/engine'
 
 const match = (over: Partial<MatchSummary>): MatchSummary => ({
@@ -83,5 +83,21 @@ describe('assignPositions', () => {
       { champion: 'Zed', position: 'mid' },
       { champion: 'Yasuo', position: 'top' }
     ])
+  })
+})
+
+describe('matchesForDraft', () => {
+  const ms = [
+    match({ id: 'solo', queue: 'SOLORANKED' }),
+    match({ id: 'flex', queue: 'FLEXRANKED' }),
+    match({ id: 'aram', queue: 'ARAM' }),
+    match({ id: 'remake', queue: 'SOLORANKED', remake: true })
+  ]
+  const ids = (q: 'solo' | 'flex' | 'other', f: 'ranked' | 'all' = 'ranked') => matchesForDraft(ms, q, f).map((m) => m.id)
+  it('en solo, ne garde que la solo', () => expect(ids('solo')).toEqual(['solo']))
+  it('en flex, garde solo et flex', () => expect(ids('flex')).toEqual(['solo', 'flex']))
+  it('ailleurs, applique le réglage général', () => {
+    expect(ids('other')).toEqual(['solo', 'flex'])
+    expect(ids('other', 'all')).toEqual(['solo', 'flex', 'aram'])
   })
 })

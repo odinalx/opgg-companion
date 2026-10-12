@@ -11,6 +11,11 @@ export interface PlayerContext {
   matches: MatchSummary[] // déjà filtrées selon la file choisie
   mastery: Record<string, { level: number; points: number }> | null
   owned: string[] | null
+  /**
+   * Stats de la saison par champion (OP.GG, classées solo + flex cumulées). Fournies
+   * seulement quand elles correspondent à la file du draft ; complètent l'historique local.
+   */
+  season?: Array<{ champion: string; games: number; wins: number }>
 }
 
 export interface DraftResult {
@@ -54,6 +59,14 @@ export class DraftEngine {
       .filter((c): c is string => !!c)
     const isTaken = (c: string): boolean => taken.some((t) => same(t, c))
     const record = personalRecord(player.matches)
+    // Pour chaque champion, on garde la source qui a le plus de games.
+    for (const c of player.season ?? []) {
+      const cur = [...record.entries()].find(([k]) => same(k, c.champion))
+      if (!cur || cur[1].games < c.games) {
+        if (cur) record.delete(cur[0])
+        record.set(c.champion, { games: c.games, wins: c.wins })
+      }
+    }
     const playedOnRole = new Set(player.matches.filter((m) => m.position === myPos).map((m) => m.champion))
     const inMeta = (c: string): boolean => laneMeta.some((m) => same(m.champion, c))
 

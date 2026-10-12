@@ -57,7 +57,7 @@ export function metaComponent(c: CandidateInput): CriterionResult {
   if (!c.meta) return { value: 0.1, label: 'hors méta sur ce rôle' }
   const { winRate, tier } = c.meta
   const tierScore = clamp01((5 - tier) / 4) // tier 1 (OP) -> 1, tier 5 -> 0
-  return { value: 0.7 * scaleWr(winRate, 0.45, 0.55) + 0.3 * tierScore, label: `méta : ${pct(winRate)} WR, tier ${tier}` }
+  return { value: 0.7 * scaleWr(winRate, 0.45, 0.55) + 0.3 * tierScore, label: `méta : ${pct(winRate)} WR, ${tier === 0 ? 'tier OP' : `tier ${tier}`}` }
 }
 
 export function matchupComponent(c: CandidateInput): CriterionResult {

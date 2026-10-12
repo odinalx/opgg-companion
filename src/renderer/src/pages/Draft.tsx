@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DraftResultDto } from '@shared/api'
-import type { CriterionKey, DraftSlot, DraftState, DraftWeights, Position, Settings, Suggestion } from '@shared/types'
+import type { CriterionKey, DraftQueue, DraftSlot, DraftState, DraftWeights, Position, Settings, Suggestion } from '@shared/types'
 import { CRITERIA, POSITIONS } from '@shared/types'
 import { useApp } from '../store'
 import { ChampIcon, Splash } from '../components/Icons'
@@ -15,6 +15,12 @@ const CRITERION_LABELS: Record<CriterionKey, { name: string; help: string }> = {
   synergy: { name: 'Synergie', help: 'Winrate en duo avec les champions de tes alliés.' }
 }
 
+const QUEUE_LABELS: Record<DraftQueue, { name: string; help: string }> = {
+  solo: { name: 'Classée solo', help: 'tes games en solo uniquement' },
+  flex: { name: 'Classée flex', help: 'tes games en solo et en flex' },
+  other: { name: 'Autre file', help: 'selon le réglage « games prises en compte »' }
+}
+
 const COLOR_VAR: Record<CriterionKey, string> = {
   personal: 'var(--color-c-personal)',
   mastery: 'var(--color-c-mastery)',
@@ -23,7 +29,8 @@ const COLOR_VAR: Record<CriterionKey, string> = {
   synergy: 'var(--color-c-synergy)'
 }
 
-const emptyDraft = (): DraftState => ({
+const emptyDraft = (queue: DraftQueue = 'solo'): DraftState => ({
+  queue,
   myPosition: null,
   allies: Array.from({ length: 4 }, () => ({ champion: null, position: null })),
   enemies: Array.from({ length: 5 }, () => ({ champion: null, position: null })),
@@ -81,8 +88,8 @@ export function DraftPage() {
         title="Draft"
         subtitle={
           isLive
-            ? 'Sélection en cours : la composition se met à jour en direct.'
-            : 'Simulation : renseigne ton rôle et les picks connus. En vraie sélection, tout se remplit seul.'
+            ? `Sélection en cours : la composition se met à jour en direct. Winrate perso sur ${QUEUE_LABELS[state.queue].help}.`
+            : `Simulation : renseigne ton rôle et les picks connus. Winrate perso sur ${QUEUE_LABELS[state.queue].help}.`
         }
       >
         {live && (
@@ -95,10 +102,28 @@ export function DraftPage() {
             </ModeButton>
           </div>
         )}
-        {!isLive && (
-          <Button variant="ghost" onClick={() => setManual(emptyDraft())}>
-            Vider la composition
-          </Button>
+        {isLive ? (
+          <span className="rounded-xl border border-line bg-panel px-3.5 py-2 text-sm font-semibold" title={`Winrate perso calculé sur ${QUEUE_LABELS[state.queue].help}`}>
+            {QUEUE_LABELS[state.queue].name}
+          </span>
+        ) : (
+          <>
+            <select
+              aria-label="File de la partie"
+              value={manual.queue}
+              onChange={(e) => setManual({ ...manual, queue: e.target.value as DraftQueue })}
+              className="field px-3 py-2 text-sm"
+            >
+              {(Object.keys(QUEUE_LABELS) as DraftQueue[]).map((q) => (
+                <option key={q} value={q}>
+                  {QUEUE_LABELS[q].name}
+                </option>
+              ))}
+            </select>
+            <Button variant="ghost" onClick={() => setManual(emptyDraft(manual.queue))}>
+              Vider la composition
+            </Button>
+          </>
         )}
       </PageHeader>
 

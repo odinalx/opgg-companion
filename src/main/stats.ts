@@ -1,6 +1,6 @@
 // Agrégats de stats et fusion des historiques (OP.GG + client local).
 
-import type { MatchSummary, Position, StatsAggregate } from '@shared/types'
+import type { DraftQueue, MatchSummary, Position, StatsAggregate } from '@shared/types'
 import { POSITIONS } from '@shared/types'
 import { skillProfile } from './skills'
 
@@ -8,6 +8,16 @@ export const RANKED_QUEUES = new Set(['SOLORANKED', 'FLEXRANKED'])
 
 export function filterMatches(matches: MatchSummary[], queue: 'ranked' | 'all'): MatchSummary[] {
   return matches.filter((m) => !m.remake && (queue === 'all' || RANKED_QUEUES.has(m.queue)))
+}
+
+/**
+ * Games perso prises en compte pour un draft : en solo, seulement la solo ;
+ * en flex, solo + flex ; dans les autres files, le réglage général.
+ */
+export function matchesForDraft(matches: MatchSummary[], queue: DraftQueue, fallback: 'ranked' | 'all'): MatchSummary[] {
+  if (queue === 'solo') return matches.filter((m) => !m.remake && m.queue === 'SOLORANKED')
+  if (queue === 'flex') return matches.filter((m) => !m.remake && RANKED_QUEUES.has(m.queue))
+  return filterMatches(matches, fallback)
 }
 
 /**

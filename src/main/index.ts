@@ -72,6 +72,25 @@ async function captureAllPages(w: BrowserWindow, dir: string): Promise<void> {
     await wait(Number(process.env.OPGG_CAPTURE_DELAY ?? 8000))
     writeFileSync(join(dir, `${page}.png`), (await w.webContents.capturePage()).toPNG())
   }
+  // OPGG_CAPTURE_SIM="jungle|Ahri,Garen|Vi,Jinx,Darius" : simulation de draft (rôle|alliés|ennemis).
+  const sim = process.env.OPGG_CAPTURE_SIM
+  if (sim) {
+    const [role, allies, enemies] = sim.split('|')
+    await w.webContents.executeJavaScript(`(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+      const click = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.trim() === text)?.click()
+      document.querySelector('[data-nav="draft"]').click(); await wait(500)
+      click('button', 'Simulation'); await wait(500)
+      click('[role=radio]', ${JSON.stringify(role.charAt(0).toUpperCase() + role.slice(1))}); await wait(300)
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+      const inputs = [...document.querySelectorAll('input[aria-label="Champion"]')]
+      const fill = (el, v) => { setter.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })) };
+      ${JSON.stringify(allies.split(','))}.forEach((c, i) => c && fill(inputs[i], c));
+      ${JSON.stringify(enemies.split(','))}.forEach((c, i) => c && fill(inputs[4 + i], c));
+    })()`)
+    await wait(Number(process.env.OPGG_CAPTURE_DELAY ?? 8000) * 2)
+    writeFileSync(join(dir, `draft-sim-${role}.png`), (await w.webContents.capturePage()).toPNG())
+  }
   app.quit()
 }
 

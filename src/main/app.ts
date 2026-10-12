@@ -3,6 +3,7 @@
 
 import type {
   ClientStatus,
+  DraftQueue,
   DraftState,
   MatchDetail,
   MatchSummary,
@@ -15,13 +16,13 @@ import type {
 } from '@shared/types'
 import { DEFAULT_SETTINGS } from '@shared/types'
 import { championById, loadStaticData, type StaticData } from './ddragon'
-import { type DraftResult, DraftEngine } from './draft/engine'
+import { type DraftResult, DraftEngine, type PlayerContext } from './draft/engine'
 import { featureVector } from './draft/score'
 import { MIN_SAMPLES, type Sample, trainModel } from './draft/train'
 import { sessionToDraft, lcuPosition } from './lcu/champSelect'
 import { LcuConnector } from './lcu/connector'
 import { OpggClient } from './opgg/client'
-import { aggregate, filterMatches, mergeMatches } from './stats'
+import { aggregate, filterMatches, matchesForDraft, mergeMatches } from './stats'
 import { DiskCache, JsonFile, dataPath } from './store'
 
 type Emit = (channel: string, payload: unknown) => void
@@ -57,11 +58,15 @@ export class AppService {
       this.emit('client:status', s)
       if (s.account) this.settings.update((cur) => ({ ...cur, region: s.account!.region }))
     })
-    this.lcu.on('champSelect', (session) => this.emit('draft:live', session ? sessionToDraft(session) : null))
+    this.lcu.on('champSelect', (session) =>
+      this.emit('draft:live', session ? sessionToDraft(session, this.lcu.getQueueId()) : null)
+    )
   }
 
   start(): void {
     void loadStaticData().catch(() => undefined)
+    // Préchauffe le cache de la méta pour que le premier draft soit rapide.
+    void this.engine.loadAllMeta().catch(() => undefined)
     this.lcu.start()
   }
 
@@ -191,9 +196,10 @@ export class AppService {
 
   // ---------- Draft helper ----------
 
-  private async playerContext(acc: RiotAccount | null) {
+  private async playerContext(acc: RiotAccount | null, queue: DraftQueue | null = null): Promise<PlayerContext> {
     const settings = this.settings.get()
-    const matches = acc ? filterMatches((await this.getMatches(acc, false)).matches, settings.queueFilter) : []
+    const all = acc ? (await this.getMatches(acc, false)).matches : []
+    const matches = queue ? matchesForDraft(all, queue, settings.queueFilter) : filterMatches(all, settings.queueFilter)
     let mastery = null
     let owned = null
     if (acc && this.isLocalAccount(acc)) {
@@ -216,14 +222,24 @@ export class AppService {
 
   getLiveDraft(): DraftState | null {
     const session = this.lcu.getChampSelect()
-    return session ? sessionToDraft(session) : null
+    return session ? sessionToDraft(session, this.lcu.getQueueId()) : null
   }
 
   async suggest(state: DraftState): Promise<DraftResult> {
     await loadStaticData()
     const acc = this.currentAccount()
     const settings = this.settings.get()
-    const player = await this.playerContext(acc)
+    const player = await this.playerContext(acc, state.queue)
+    // Les stats de saison OP.GG cumulent solo + flex : valables pour un draft flex (ou une file
+    // non classée avec le réglage « classées »), jamais pour un draft solo.
+    const seasonFits = state.queue === 'flex' || (state.queue === 'other' && settings.queueFilter === 'ranked')
+    if (acc && seasonFits) {
+      try {
+        player.season = (await this.opgg.getProfile(acc)).champions
+      } catch {
+        /* profil indisponible : historique seul */
+      }
+    }
     const model = acc ? this.models.get()[accKey(acc)] : undefined
     const modelWeights = settings.useModel && model && model.samples >= MIN_SAMPLES ? model.weights : null
     return this.engine.suggest(state, player, settings, modelWeights)
@@ -285,6 +301,7 @@ function detailToDraft(detail: MatchDetail, game: MatchSummary): DraftState | nu
   if (!me) return null
   const slot = (p: (typeof all)[number]) => ({ champion: p.champion, position: p.position })
   return {
+    queue: game.queue === 'SOLORANKED' ? 'solo' : game.queue === 'FLEXRANKED' ? 'flex' : 'other',
     myPosition: me.position ?? game.position,
     allies: all.filter((p) => p.teamKey === me.teamKey && p !== me).map(slot),
     enemies: all.filter((p) => p.teamKey !== me.teamKey).map(slot),

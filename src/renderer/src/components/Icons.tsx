@@ -24,7 +24,17 @@ export function ChampIcon({ name, size = 40, className = '' }: { name: string | 
 export function ItemIcon({ id, size = 24 }: { id: number; size?: number }) {
   const data = useStatic()
   if (!data || !id) return <div style={{ width: size, height: size }} className="rounded bg-panel-2" />
-  return <img src={`${base}/${data.version}/img/item/${id}.png`} alt="" style={{ width: size, height: size }} className="rounded" loading="lazy" />
+  // Les items de modes spéciaux (Arena…) n'existent pas dans Data Dragon : on masque l'image cassée.
+  return (
+    <img
+      src={`${base}/${data.version}/img/item/${id}.png`}
+      alt=""
+      style={{ width: size, height: size }}
+      className="rounded bg-panel-2"
+      loading="lazy"
+      onError={(e) => (e.currentTarget.style.visibility = 'hidden')}
+    />
+  )
 }
 
 export function SpellIcon({ id, size = 20 }: { id: number; size?: number }) {

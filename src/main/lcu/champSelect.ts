@@ -1,6 +1,6 @@
 // Conversion de la session de champ select LCU (/lol-champ-select/v1/session) en DraftState.
 
-import type { DraftSlot, DraftState, Position } from '@shared/types'
+import type { DraftQueue, DraftSlot, DraftState, Position } from '@shared/types'
 import { championById } from '../ddragon'
 
 export function lcuPosition(p: string | undefined | null): Position | null {
@@ -27,7 +27,14 @@ function name(id: number | undefined | null): string | null {
   return championById(id)?.name ?? null
 }
 
-export function sessionToDraft(session: any): DraftState {
+/** 420 = classée solo/duo, 440 = classée flex. */
+export function queueFromId(queueId: number | null | undefined): DraftQueue {
+  if (queueId === 420) return 'solo'
+  if (queueId === 440) return 'flex'
+  return 'other'
+}
+
+export function sessionToDraft(session: any, queueId?: number | null): DraftState {
   const myCell = session.localPlayerCellId
   const me = (session.myTeam ?? []).find((p: any) => p.cellId === myCell)
   const slot = (p: any): DraftSlot => ({
@@ -49,6 +56,7 @@ export function sessionToDraft(session: any): DraftState {
       }
 
   return {
+    queue: queueFromId(queueId),
     myPosition: lcuPosition(me?.assignedPosition),
     allies: (session.myTeam ?? []).filter((p: any) => p.cellId !== myCell).map(slot),
     enemies: (session.theirTeam ?? []).map((p: any) => ({

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { setChampions } from '../ddragon'
 import { parseCommandLine, parseLockfile } from './discovery'
-import { sessionToDraft } from './champSelect'
+import { queueFromId, sessionToDraft } from './champSelect'
 import { toRegion } from './connector'
 
 describe('découverte du client', () => {
@@ -30,6 +30,9 @@ describe('sessionToDraft', () => {
       { id: 238, key: 'Zed', name: 'Zed' },
       { id: 157, key: 'Yasuo', name: 'Yasuo' }
     ])
+    expect(queueFromId(420)).toBe('solo')
+    expect(queueFromId(440)).toBe('flex')
+    expect(queueFromId(400)).toBe('other')
     const draft = sessionToDraft({
       localPlayerCellId: 2,
       myTeam: [
@@ -39,7 +42,8 @@ describe('sessionToDraft', () => {
       theirTeam: [{ cellId: 6, championId: 238, assignedPosition: '' }],
       bans: { myTeamBans: [157], theirTeamBans: [] },
       actions: []
-    })
+    }, 440)
+    expect(draft.queue).toBe('flex')
     expect(draft.myPosition).toBe('mid')
     expect(draft.allies).toEqual([{ champion: 'Lee Sin', position: 'jungle' }])
     expect(draft.enemies).toEqual([{ champion: 'Zed', position: null }])

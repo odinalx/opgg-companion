@@ -14,7 +14,8 @@ const PASSWORD = 'mock-token'
 const ACCOUNT = {
   gameName: process.env.MOCK_NAME ?? 'Hide on bush',
   tagLine: process.env.MOCK_TAG ?? 'KR1',
-  region: process.env.MOCK_REGION ?? 'KR'
+  region: process.env.MOCK_REGION ?? 'KR',
+  role: process.env.MOCK_ROLE ?? 'middle' // top, jungle, middle, bottom, utility
 }
 
 const versions = await (await fetch('https://ddragon.leagueoflegends.com/api/versions.json')).json()
@@ -29,22 +30,24 @@ const steps = [
   (s) => (s.theirTeam[0].championId = idOf('Zed')),
   (s) => (s.theirTeam[1].championId = idOf('Vi')),
   (s) => (s.myTeam[3].championPickIntent = idOf('Thresh')),
-  (s) => (s.theirTeam[2].championId = idOf('Jinx'))
+  (s) => (s.theirTeam[2].championId = idOf('Jinx')),
+  (s) => (s.theirTeam[3].championId = idOf('Darius'))
 ]
 
-const freshSession = () => ({
+// Le joueur local (cellule 2) prend le rôle MOCK_ROLE ; l'allié qui l'avait récupère le milieu.
+const ROLES = ['jungle', 'top', 'middle', 'utility', 'bottom']
+const freshSession = () => {
+  const roles = [...ROLES]
+  const swap = roles.indexOf(ACCOUNT.role)
+  ;[roles[2], roles[swap]] = [roles[swap], roles[2]]
+  return {
   localPlayerCellId: 2,
-  myTeam: [
-    { cellId: 0, championId: 0, championPickIntent: 0, assignedPosition: 'jungle' },
-    { cellId: 1, championId: 0, championPickIntent: 0, assignedPosition: 'top' },
-    { cellId: 2, championId: 0, championPickIntent: 0, assignedPosition: 'middle' },
-    { cellId: 3, championId: 0, championPickIntent: 0, assignedPosition: 'utility' },
-    { cellId: 4, championId: 0, championPickIntent: 0, assignedPosition: 'bottom' }
-  ],
+  myTeam: roles.map((assignedPosition, cellId) => ({ cellId, championId: 0, championPickIntent: 0, assignedPosition })),
   theirTeam: [5, 6, 7, 8, 9].map((cellId) => ({ cellId, championId: 0, assignedPosition: '' })),
   bans: { myTeamBans: [], theirTeamBans: [] },
   actions: []
-})
+  }
+}
 
 let session = freshSession()
 let step = 0
@@ -60,6 +63,7 @@ const routes = {
   }),
   '/riotclient/region-locale': () => ({ region: ACCOUNT.region, locale: 'fr_FR' }),
   '/lol-champ-select/v1/session': () => session,
+  '/lol-gameflow/v1/session': () => ({ gameData: { queue: { id: Number(process.env.MOCK_QUEUE ?? 420) } } }),
   '/lol-champion-mastery/v1/local-player/champion-mastery': () => [
     { championId: idOf('Ahri'), championLevel: 12, championPoints: 182000 },
     { championId: idOf('Orianna'), championLevel: 8, championPoints: 96000 },

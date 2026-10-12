@@ -31,6 +31,7 @@ export class LcuConnector extends EventEmitter<LcuEvents> {
   private timer: NodeJS.Timeout | null = null
   private status: ClientStatus = { connected: false }
   private lastSession: any | null = null
+  private queueId: number | null = null
 
   start(): void {
     void this.tick()
@@ -48,6 +49,11 @@ export class LcuConnector extends EventEmitter<LcuEvents> {
 
   getChampSelect(): any | null {
     return this.lastSession
+  }
+
+  /** File de la partie en cours de sélection (420 solo, 440 flex…). */
+  getQueueId(): number | null {
+    return this.queueId
   }
 
   private async tick(): Promise<void> {
@@ -105,7 +111,18 @@ export class LcuConnector extends EventEmitter<LcuEvents> {
   }
 
   private setSession(session: any | null): void {
+    const starting = session && !this.lastSession
     this.lastSession = session
+    if (!session) this.queueId = null
+    if (starting) {
+      // La session de champ select ne contient pas la file : on la lit une fois dans le gameflow.
+      void this.get('/lol-gameflow/v1/session')
+        .then((g) => {
+          this.queueId = g?.gameData?.queue?.id ?? null
+          if (this.lastSession) this.emit('champSelect', this.lastSession)
+        })
+        .catch(() => undefined)
+    }
     this.emit('champSelect', session)
   }
 
