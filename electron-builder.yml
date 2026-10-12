@@ -6,6 +6,10 @@ directories:
 files:
   - out/**/*
   - package.json
+  # koffi embarque ses binaires pour toutes les plateformes : seul win32_x64 sert.
+  - '!node_modules/koffi/build/koffi/{darwin,linux,freebsd,openbsd,musl}*/**'
+  - '!node_modules/koffi/build/koffi/win32_{arm64,ia32}/**'
+  - '!node_modules/koffi/src/**'
 asar: true
 # Bibliothèque native de koffi (lecture de la touche Tab) : doit rester hors de l'archive asar.
 asarUnpack:
