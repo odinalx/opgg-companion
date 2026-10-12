@@ -5,6 +5,7 @@ import type { Api, ApiMethod } from '@shared/api'
 import { AppService } from './app'
 import { launchRiotClient } from './lcu/launcher'
 import { OverlayManager } from './live/overlay'
+import { sanitizeAccount, sanitizeBuild, sanitizeChampion, sanitizePosition, sanitizeSettingsPatch } from './validate'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 let win: BrowserWindow | null = null
@@ -21,9 +22,21 @@ function loadRenderer(w: BrowserWindow, query = ''): void {
 const overlay = new OverlayManager(
   () => service.getSettings().overlay,
   () => service.comparisonTier(),
+  () => {
+    const st = service.lcu.getStatus()
+    return st.connected ? (st.phase ?? 'None') : null
+  },
   (w) => loadRenderer(w, '?overlay=1'),
   join(here, '../preload/index.cjs')
 )
+
+const importParts = (p: unknown) => {
+  const o = (typeof p === 'object' && p !== null ? p : {}) as Record<string, unknown>
+  return { runes: o.runes === true, spells: o.spells === true, items: o.items === true }
+}
+
+// Mode capture (outil de dev : exécute du JS dans les pages) : jamais dans l'app installée.
+const CAPTURE_DIR = app.isPackaged ? undefined : process.env.OPGG_CAPTURE_DIR
 
 // Chaque méthode de l'API renderer correspond à un handler IPC du même nom.
 const handlers: { [K in ApiMethod]: (...args: Parameters<Api[K]>) => ReturnType<Api[K]> | Awaited<ReturnType<Api[K]>> } = {
@@ -31,25 +44,40 @@ const handlers: { [K in ApiMethod]: (...args: Parameters<Api[K]>) => ReturnType<
   getClientStatus: () => service.getClientStatus(),
   getSettings: () => service.getSettings(),
   setSettings: (patch) => {
-    const next = service.setSettings(patch)
-    if (patch.overlay) overlay.applySettings()
+    const clean = sanitizeSettingsPatch(patch, service.getSettings())
+    const next = service.setSettings(clean)
+    if (clean.overlay) overlay.applySettings()
+    // La fenêtre principale garde ainsi des réglages à jour, même modifiés depuis l'overlay.
+    win?.webContents.send('settings:changed', next)
     return next
   },
   currentAccount: () => service.currentAccount(),
-  getProfile: (acc) => service.getProfile(acc),
-  getMatches: (acc, refresh) => service.getMatches(acc, refresh),
-  getMatchDetail: (acc, match) => service.getMatchDetail(acc, match),
-  getStats: (acc) => service.getStats(acc),
+  getProfile: (acc) => service.getProfile(sanitizeAccount(acc)),
+  getMatches: (acc, refresh) => service.getMatches(sanitizeAccount(acc), refresh === true),
+  getMatchDetail: (acc, match) => {
+    if (typeof match?.id !== 'string' || !/^[\w=%-]{1,120}$/.test(match.id) || typeof match.createdAt !== 'string')
+      throw new Error('Game invalide.')
+    return service.getMatchDetail(sanitizeAccount(acc), { id: match.id, createdAt: match.createdAt })
+  },
+  getStats: (acc) => service.getStats(sanitizeAccount(acc)),
   getLiveDraft: () => service.getLiveDraft(),
   suggest: (state) => service.suggest(state),
   getModel: () => service.getModel(),
   trainModel: () => service.trainModel((done, total) => win?.webContents.send('model:progress', { done, total })),
-  getBuild: (champion, position) => service.opgg.getBuild(champion, position),
-  importBuild: (champion, position, parts) => service.importBuild(champion, position, parts),
-  getMatchupBuild: (champion, position, opponent) => service.opgg.getMatchupBuild(champion, position, opponent),
-  getProBuilds: (champion, position, opponent) => service.getProBuilds(champion, position, opponent),
-  importBuildData: (build, parts) => service.importBuildData(build, parts),
-  setOverlayEditing: async (on) => overlay.setEditing(on),
+  getBuild: (champion, position) => service.opgg.getBuild(sanitizeChampion(champion), sanitizePosition(position)),
+  importBuild: (champion, position, parts) =>
+    service.importBuild(sanitizeChampion(champion), sanitizePosition(position), importParts(parts)),
+  getMatchupBuild: (champion, position, opponent) =>
+    service.opgg.getMatchupBuild(sanitizeChampion(champion), sanitizePosition(position), sanitizeChampion(opponent)),
+  getProBuilds: (champion, position, opponent) =>
+    service.getProBuilds(sanitizeChampion(champion), sanitizePosition(position), opponent === null ? null : sanitizeChampion(opponent)),
+  importBuildData: (build, parts) => {
+    const clean = sanitizeBuild(build)
+    if (!clean) throw new Error('Build invalide.')
+    return service.importBuildData(clean, importParts(parts))
+  },
+  setOverlayEditing: async (on) => overlay.setEditing(on === true),
+  checkShortcut: (key) => (typeof key === 'string' && key.length <= 40 ? overlay.checkShortcut(key) : 'raccourci invalide'),
   isInGame: () => overlay.inGame(),
   getOverlayState: () => ({ stats: overlay.getStats(), ui: overlay.getUi(), settings: service.getSettings().overlay }),
   getDisplays: () => {
@@ -70,7 +98,7 @@ const handlers: { [K in ApiMethod]: (...args: Parameters<Api[K]>) => ReturnType<
 }
 
 function createWindow(): void {
-  const capture = !!process.env.OPGG_CAPTURE_DIR
+  const capture = !!CAPTURE_DIR
   win = new BrowserWindow({
     width: capture ? 1600 : 1280,
     height: capture ? 1000 : 820,
@@ -87,16 +115,12 @@ function createWindow(): void {
       backgroundThrottling: !capture
     }
   })
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https:\/\//.test(url)) void shell.openExternal(url)
-    return { action: 'deny' }
-  })
   loadRenderer(win)
   win.on('closed', () => {
     win = null
     app.quit() // l'overlay seul n'a pas de sens : fermer la fenêtre principale quitte l'app
   })
-  if (process.env.OPGG_CAPTURE_DIR) void captureAllPages(win, process.env.OPGG_CAPTURE_DIR)
+  if (CAPTURE_DIR) void captureAllPages(win, CAPTURE_DIR)
 }
 
 /** Outil de dev : parcourt chaque page et enregistre une capture PNG, puis quitte. */
@@ -160,9 +184,31 @@ async function captureAllPages(w: BrowserWindow, dir: string): Promise<void> {
   app.quit()
 }
 
+/** L'app ne charge que ses propres pages (fichiers locaux, ou serveur Vite en dev). */
+function isAppUrl(url: string): boolean {
+  const dev = process.env.ELECTRON_RENDERER_URL
+  return url.startsWith('file://') || (!!dev && url.startsWith(dev))
+}
+
+// Aucune fenêtre ne peut naviguer ailleurs ni en ouvrir d'autres : une page distante hériterait
+// de l'API exposée par le preload. Les liens https s'ouvrent dans le navigateur.
+app.on('web-contents-created', (_e, contents) => {
+  contents.on('will-navigate', (e, url) => {
+    if (!isAppUrl(url)) e.preventDefault()
+  })
+  contents.setWindowOpenHandler(({ url }) => {
+    if (/^https:\/\//.test(url)) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
+})
+
 app.whenReady().then(() => {
   for (const [name, fn] of Object.entries(handlers))
-    ipcMain.handle(name, (_e, ...args: unknown[]) => (fn as (...a: unknown[]) => unknown)(...args))
+    ipcMain.handle(name, (e, ...args: unknown[]) => {
+      // Les appels ne sont acceptés que depuis les pages de l'app.
+      if (!isAppUrl(e.senderFrame?.url ?? '')) throw new Error('Origine refusée.')
+      return (fn as (...a: unknown[]) => unknown)(...args)
+    })
   service.start()
   overlay.start()
   createWindow()

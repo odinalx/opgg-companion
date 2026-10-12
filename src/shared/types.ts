@@ -411,9 +411,6 @@ export interface LiveStats {
   csPerMin: number
   tier: Tier // palier de comparaison
   bench: TierBenchmark | null // médianes du palier pour ce rôle
-  csExpected: number // CS attendus à cette minute pour le palier
-  nextMilestone: { minute: number; expected: number } | null
-  milestones: Array<{ minute: number; cs: number; expected: number }> // repères 10/15/20 déjà passés
   visionPerMin: number
   lanes: LaneGold[]
   side: 'blue' | 'red' // côté de ton équipe

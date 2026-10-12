@@ -53,8 +53,3 @@ function visionPerMin(tier: Tier, position: Position): number {
   const share = mean && roles[position] ? roles[position]!.wardsPerMin / mean : 1
   return (VISION_PER_GAME[tier] / 30) * share
 }
-
-/** CS attendus à la minute `t` pour une médiane de `rate` CS/min (pas de CS avant la 1re vague). */
-export function expectedCs(rate: number, minutes: number): number {
-  return Math.max(0, rate * (minutes - 1.1))
-}

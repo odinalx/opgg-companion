@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { setChampions } from '../ddragon'
-import { parseCommandLine, parseLockfile } from './discovery'
+import { installDirsFromRiotInstalls, parseCommandLine, parseInstallDir, parseLockfile } from './discovery'
 import { queueFromId, sessionToDraft } from './champSelect'
 import { toRegion } from './connector'
 
@@ -12,6 +12,21 @@ describe('découverte du client', () => {
   it('lit la ligne de commande de LeagueClientUx.exe', () => {
     const cmd = '"C:/Riot Games/League of Legends/LeagueClientUx.exe" "--remoting-auth-token=AbC_12-x" "--app-port=61234" --install-directory=C:/x'
     expect(parseCommandLine(cmd)).toEqual({ port: 61234, password: 'AbC_12-x', protocol: 'https' })
+  })
+  it('lit le dossier d’installation, avec ou sans guillemets', () => {
+    const quoted = '"C:/Riot Games/League of Legends/LeagueClientUx.exe" "--app-port=50000" "--install-directory=C:\\Riot Games\\League of Legends" "--app-name=LeagueClient"'
+    expect(parseInstallDir(quoted)).toBe('C:\\Riot Games\\League of Legends')
+    expect(parseInstallDir('LeagueClientUx.exe --install-directory=D:\\Jeux\\LoL --app-name=LeagueClient')).toBe('D:\\Jeux\\LoL')
+    expect(parseInstallDir('"--install-directory=E:\\LoL"')).toBe('E:\\LoL')
+    expect(parseInstallDir('rien')).toBeNull()
+  })
+  it('lit les dossiers de LoL déclarés par le Riot Client', () => {
+    const json = JSON.stringify({
+      associated_client: { 'C:/Riot Games/League of Legends/': 'C:/Riot Games/Riot Client/RiotClientServices.exe', 'C:/Riot Games/VALORANT/live/': 'x' },
+      rc_default: 'C:/Riot Games/Riot Client/RiotClientServices.exe'
+    })
+    expect(installDirsFromRiotInstalls(json)).toEqual(['C:/Riot Games/League of Legends/'])
+    expect(installDirsFromRiotInstalls('pas du json')).toEqual([])
   })
   it('normalise la région', () => {
     expect(toRegion('EUW1')).toBe('EUW')

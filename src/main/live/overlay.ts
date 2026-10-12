@@ -8,11 +8,23 @@ import { Agent, request } from 'node:https'
 import type { LiveStats, OverlaySettings, OverlayUi, Tier } from '@shared/types'
 import { loadStaticData } from '../ddragon'
 import { isTabDown } from './keys'
-import { computeLiveStats, MILESTONES } from './liveStats'
+import { computeLiveStats } from './liveStats'
 
-const LIVE_URL = process.env.LIVE_CLIENT_URL ?? 'https://127.0.0.1:2999'
+// L'API de jeu n'écoute qu'en local ; une URL de remplacement (dev, faux client) doit l'être aussi,
+// puisque la vérification du certificat est désactivée pour ce certificat auto-signé.
+const LIVE_URL = (() => {
+  const custom = process.env.LIVE_CLIENT_URL
+  if (custom && /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\/?$/.test(custom)) return custom
+  return 'https://127.0.0.1:2999'
+})()
 const localAgent = new Agent({ rejectUnauthorized: false })
-const POLL_MS = 1000
+/** Cadences : en partie, sans client LoL détecté (repli), contrôle de Tab, réaffirmation au premier plan. */
+const IN_GAME_MS = 2000
+const FALLBACK_MS = 5000
+const TAB_MS = 50
+const TOPMOST_EVERY = 5 // ticks, soit 10 s
+/** Phases du client où une partie peut tourner (l'API de jeu n'existe qu'à ce moment-là). */
+const GAME_PHASES = new Set(['GameStart', 'InProgress', 'Reconnect'])
 
 function fetchLive(path: string): Promise<any> {
   const url = new URL(path, LIVE_URL)
@@ -43,36 +55,60 @@ export class OverlayManager {
   private timer: NodeJS.Timeout | null = null
   private ui: OverlayUi = { visible: true, showBuild: false, tabHeld: false, editing: false }
   private tabTimer: NodeJS.Timeout | null = null
-  /** CS au passage de chaque repère (10/15/20 min) de la partie en cours. */
-  private milestones = new Map<number, { cs: number; expected: number }>()
   private stats: LiveStats | null = null
   private misses = 0
   /** Fenêtre « second écran » fermée par l'utilisateur : on ne la rouvre pas avant la partie suivante. */
   private closedByUser = false
 
+  private stopped = false
+  private ticks = 0
+  /** Palier de comparaison, calculé une fois par partie (évite un appel OP.GG à chaque tick). */
+  private tier: Tier | null = null
+  private shortcutsOn = false
+
   constructor(
     private readonly getSettings: () => OverlaySettings,
     private readonly getTier: () => Promise<Tier>,
+    /** Phase du client LoL, ou null s'il n'est pas détecté. */
+    private readonly getPhase: () => string | null,
     private readonly load: (win: BrowserWindow) => void,
     private readonly preload: string
   ) {}
 
   start(): void {
     this.applySettings()
-    this.timer = setInterval(() => void this.tick(), POLL_MS)
-    // Tab maintenu (tableau des scores) : affiche l'écart d'or par lane. Lecture passive, 20 fois/s.
-    this.tabTimer = setInterval(() => {
-      if (!this.win || !this.stats || process.env.OPGG_CAPTURE_DIR) return
-      const held = isTabDown()
-      if (held !== this.ui.tabHeld) this.setUi({ tabHeld: held })
-    }, 50)
+    const loop = async (): Promise<void> => {
+      await this.tick().catch(() => undefined)
+      if (this.stopped) return
+      const phase = this.getPhase()
+      const inGame = !!this.stats || (phase !== null && GAME_PHASES.has(phase))
+      this.timer = setTimeout(() => void loop(), inGame ? IN_GAME_MS : FALLBACK_MS)
+    }
+    void loop()
   }
 
   stop(): void {
-    if (this.timer) clearInterval(this.timer)
+    this.stopped = true
+    if (this.timer) clearTimeout(this.timer)
+    this.stopTab()
+    this.unbindShortcuts()
+    this.hide()
+  }
+
+  /** Tab maintenu (tableau des scores) : lecture passive, seulement tant que l'overlay existe. */
+  private startTab(): void {
+    if (this.tabTimer || process.env.OPGG_CAPTURE_DIR) return
+    const s = this.getSettings()
+    if (s.mode !== 'overlay' || !s.goldDiffOnTab) return
+    this.tabTimer = setInterval(() => {
+      const held = isTabDown()
+      if (held !== this.ui.tabHeld) this.setUi({ tabHeld: held })
+    }, TAB_MS)
+  }
+
+  private stopTab(): void {
     if (this.tabTimer) clearInterval(this.tabTimer)
-    globalShortcut.unregisterAll()
-    this.win?.destroy()
+    this.tabTimer = null
   }
 
   getStats(): LiveStats | null {
@@ -91,30 +127,68 @@ export class OverlayManager {
   private displayId: number | null = null
 
   /** À rappeler quand les réglages changent : raccourcis, visibilité, mode et écran. */
-  applySettings(): string[] {
+  applySettings(): void {
     const s = this.getSettings()
-    // Changement de mode ou d'écran : la fenêtre sera recréée au prochain tick.
-    if (this.win && (s.mode !== this.mode || s.displayId !== this.displayId)) {
+    if (!s.enabled) {
+      this.hide()
+      return
+    }
+    // Changement de mode ou d'écran : la fenêtre sera recréée au prochain tick, hors mode déplacement.
+    if (this.win && (s.mode !== this.mode || (s.mode === 'window' && s.displayId !== this.displayId))) {
       const w = this.win
       this.win = null
+      this.ui = { ...this.ui, editing: false }
       w.destroy()
     }
-    globalShortcut.unregisterAll()
+    // Raccourcis actifs seulement pendant une partie : hors partie, ils restent libres pour les autres applis.
+    if (this.win) this.bindShortcuts()
+    this.stopTab()
+    if (this.win) this.startTab()
+    if (this.win && !this.win.isDestroyed()) this.win.webContents.send('overlay:settings', s)
+  }
+
+  private bindShortcuts(): string[] {
+    this.unbindShortcuts()
+    const s = this.getSettings()
     const errors: string[] = []
     const bind = (key: string, fn: () => void): void => {
       try {
-        if (!globalShortcut.register(key, fn)) errors.push(`raccourci ${key} déjà utilisé par une autre application`)
+        if (!globalShortcut.register(key, fn)) errors.push(`${key} est déjà utilisé par une autre application`)
       } catch {
-        errors.push(`raccourci ${key} invalide`)
+        errors.push(`${key} n'est pas un raccourci valide`)
       }
     }
-    if (s.enabled) {
-      bind(s.toggleKey, () => this.setUi({ visible: !this.ui.visible }))
-      bind(s.buildKey, () => this.setUi({ showBuild: !this.ui.showBuild, visible: true }))
-      bind(s.editKey, () => this.setEditing(!this.ui.editing))
-    } else this.hide()
-    this.win?.webContents.send('overlay:settings', s)
+    bind(s.toggleKey, () => {
+      // Masquer pendant le mode déplacement laisserait une couche invisible qui capte les clics du jeu.
+      if (this.ui.editing) this.setEditing(false)
+      this.setUi({ visible: !this.ui.visible })
+    })
+    bind(s.buildKey, () => this.setUi({ showBuild: !this.ui.showBuild, visible: true }))
+    if (s.mode === 'overlay') bind(s.editKey, () => this.setEditing(!this.ui.editing))
+    this.shortcutsOn = true
     return errors
+  }
+
+  private unbindShortcuts(): void {
+    if (!this.shortcutsOn) return
+    globalShortcut.unregisterAll()
+    this.shortcutsOn = false
+  }
+
+  /**
+   * Vérifie qu'un raccourci peut être enregistré (pour prévenir dans les réglages), sans le
+   * garder : il ne sera réellement pris qu'en partie.
+   */
+  checkShortcut(key: string): string | null {
+    const s = this.getSettings()
+    if (this.shortcutsOn && [s.toggleKey, s.buildKey, s.editKey].includes(key)) return null
+    try {
+      if (!globalShortcut.register(key, () => undefined)) return `${key} est déjà utilisé par une autre application`
+      globalShortcut.unregister(key)
+      return null
+    } catch {
+      return `${key} n'est pas un raccourci valide`
+    }
   }
 
   /**
@@ -122,14 +196,15 @@ export class OverlayManager {
    * redevient transparent aux clics et non focusable. Uniquement pendant une partie.
    */
   setEditing(on: boolean): void {
-    if (on && !this.stats) return // l'overlay n'existe qu'en partie
+    if (on && (!this.stats || !this.getSettings().enabled)) return // l'overlay n'existe qu'en partie
     if (on && this.getSettings().mode === 'overlay') {
       this.ensureWindow()
-      const w = this.win!
+      const w = this.win
+      if (!w || w.isDestroyed()) return
       w.setIgnoreMouseEvents(false)
       w.setFocusable(true)
       w.focus()
-    } else if (this.win && this.mode === 'overlay') {
+    } else if (this.win && !this.win.isDestroyed() && this.mode === 'overlay') {
       this.win.setIgnoreMouseEvents(true)
       this.win.setFocusable(false)
     }
@@ -143,45 +218,70 @@ export class OverlayManager {
 
   setUi(patch: Partial<OverlayUi>): void {
     this.ui = { ...this.ui, ...patch }
-    this.win?.webContents.send('overlay:ui', this.ui)
+    if (this.win && !this.win.isDestroyed()) this.win.webContents.send('overlay:ui', this.ui)
   }
 
   private async tick(): Promise<void> {
+    if (this.stopped) return
+    // Hors partie (salon, sélection…), l'API de jeu n'existe pas : inutile de l'interroger.
+    const phase = this.getPhase()
+    if (phase !== null && !GAME_PHASES.has(phase)) {
+      if (this.stats) this.endGame()
+      return
+    }
     try {
       const data = await fetchLive('/liveclientdata/allgamedata')
       await loadStaticData()
-      const stats = computeLiveStats(data, await this.getTier())
-      if (stats) {
-        for (const m of MILESTONES)
-          if (stats.gameTime >= m * 60 && !this.milestones.has(m) && stats.gameTime < m * 60 + 90 && stats.bench)
-            this.milestones.set(m, { cs: stats.cs, expected: Math.round(stats.csExpected) })
-        stats.milestones = [...this.milestones.entries()].map(([minute, v]) => ({ minute, ...v }))
-      }
-      this.stats = stats
+      const tier = await this.currentTier()
+      if (this.stopped) return // fermeture de l'app pendant les appels
+      this.stats = computeLiveStats(data, tier)
       this.misses = 0
       if (this.stats && this.getSettings().enabled && !this.closedByUser) {
         this.ensureWindow()
-        // Le jeu peut repasser au premier plan : on remet l'overlay au-dessus, sans l'activer.
-        if (this.mode === 'overlay' && this.win && !this.win.isDestroyed()) this.win.setAlwaysOnTop(true, 'screen-saver')
-        this.win?.webContents.send('overlay:stats', this.stats)
+        const w = this.win
+        if (!w || w.isDestroyed()) return
+        // Le jeu peut repasser au premier plan : on remet l'overlay au-dessus (sans l'activer), de temps en temps.
+        if (this.mode === 'overlay' && ++this.ticks % TOPMOST_EVERY === 0) w.setAlwaysOnTop(true, 'screen-saver')
+        w.webContents.send('overlay:stats', this.stats)
       }
     } catch {
-      // Pas de partie en cours (ou écran de chargement) : on ferme l'overlay après quelques échecs.
-      if (++this.misses === 5) {
-        this.stats = null
-        this.milestones.clear()
-        this.closedByUser = false
-        this.hide()
-      }
+      // Écran de chargement ou fin de partie : on ferme l'overlay après quelques échecs.
+      if (++this.misses >= 3 && this.stats) this.endGame()
     }
   }
 
+  private tierPending: Promise<Tier> | null = null
+
+  /**
+   * Palier de comparaison sans jamais bloquer le HUD : si OP.GG tarde, Or sert en attendant,
+   * et le vrai palier remplace le repli dès qu'il arrive (il est ensuite gardé pour la partie).
+   */
+  private currentTier(): Promise<Tier> {
+    if (this.tier) return Promise.resolve(this.tier)
+    this.tierPending ??= this.getTier()
+      .then((t) => (this.tier = t))
+      .catch(() => 'GOLD' as Tier)
+      .finally(() => (this.tierPending = null))
+    const fallback = new Promise<Tier>((r) => setTimeout(() => r('GOLD'), 4000))
+    return Promise.race([this.tierPending, fallback])
+  }
+
+  private endGame(): void {
+    this.stats = null
+    this.tier = null
+    this.misses = 0
+    this.closedByUser = false
+    this.hide()
+  }
+
   private ensureWindow(): void {
-    if (this.win) return
+    if (this.win || this.stopped) return
     const s = this.getSettings()
     this.mode = s.mode
     this.displayId = s.displayId
-    const display = screen.getAllDisplays().find((d) => d.id === s.displayId) ?? screen.getPrimaryDisplay()
+    // L'écran choisi ne vaut que pour la fenêtre séparée ; l'overlay couvre l'écran principal (celui du jeu).
+    const display =
+      (s.mode === 'window' && screen.getAllDisplays().find((d) => d.id === s.displayId)) || screen.getPrimaryDisplay()
     const webPreferences = { preload: this.preload, contextIsolation: true, sandbox: true }
     let win: BrowserWindow
     if (s.mode === 'window') {
@@ -224,18 +324,24 @@ export class OverlayManager {
       if (this.win === win) {
         this.win = null
         this.closedByUser = true
+        this.stopTab()
+        this.unbindShortcuts()
       }
     })
     this.load(win)
     // Dans les deux modes, la fenêtre apparaît sans prendre le focus du jeu.
     win.once('ready-to-show', () => win.showInactive())
     this.win = win
+    this.startTab()
+    this.bindShortcuts()
   }
 
   private hide(): void {
+    this.stopTab()
+    this.unbindShortcuts()
     const w = this.win
     this.win = null // avant destroy : ce n'est pas une fermeture par l'utilisateur
-    w?.destroy()
+    if (w && !w.isDestroyed()) w.destroy()
     this.ui = { visible: true, showBuild: false, tabHeld: false, editing: false }
   }
 }

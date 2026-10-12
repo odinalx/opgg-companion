@@ -13,7 +13,9 @@ import { discoverClient, type LcuCredentials } from './discovery'
 import { lcuPosition } from './champSelect'
 
 const localAgent = new Agent({ rejectUnauthorized: false })
-const POLL_MS = 3000
+/** Sans client : recherche rapide (lockfiles). Connecté : simple contrôle de vie, le WebSocket fait le reste. */
+const SEARCH_MS = 3000
+const HEALTH_MS = 10_000
 
 const EVENTS = {
   champSelect: 'OnJsonApiEvent_lol-champ-select_v1_session',
@@ -29,17 +31,23 @@ export class LcuConnector extends EventEmitter<LcuEvents> {
   private creds: LcuCredentials | null = null
   private ws: WebSocket | null = null
   private timer: NodeJS.Timeout | null = null
+  private stopped = false
   private status: ClientStatus = { connected: false }
   private lastSession: any | null = null
   private queueId: number | null = null
 
   start(): void {
-    void this.tick()
-    this.timer = setInterval(() => void this.tick(), POLL_MS)
+    const loop = async (): Promise<void> => {
+      await this.tick().catch(() => undefined) // une erreur ne doit jamais arrêter la boucle
+      if (this.stopped) return
+      this.timer = setTimeout(() => void loop(), this.creds ? HEALTH_MS : SEARCH_MS)
+    }
+    void loop()
   }
 
   stop(): void {
-    if (this.timer) clearInterval(this.timer)
+    this.stopped = true
+    if (this.timer) clearTimeout(this.timer)
     this.ws?.close()
   }
 
@@ -56,11 +64,21 @@ export class LcuConnector extends EventEmitter<LcuEvents> {
     return this.queueId
   }
 
-  private async tick(): Promise<void> {
+  private ticking: Promise<void> | null = null
+
+  /** Un seul contrôle à la fois : la boucle et la fermeture du socket peuvent en demander un en même temps. */
+  private tick(): Promise<void> {
+    this.ticking ??= this.doTick().finally(() => (this.ticking = null))
+    return this.ticking
+  }
+
+  private async doTick(): Promise<void> {
     if (this.creds) {
-      // Déjà connecté : on vérifie que le client répond toujours.
+      // Déjà connecté : on vérifie que le client répond toujours, et on rattrape la phase
+      // si un événement du socket a été manqué (socket tombé puis rouvert).
       try {
-        await this.get('/lol-gameflow/v1/gameflow-phase')
+        const phase = await this.get('/lol-gameflow/v1/gameflow-phase')
+        if (typeof phase === 'string' && phase !== this.status.phase) this.setStatus({ ...this.status, phase })
         if (!this.ws) this.openSocket()
         return
       } catch {
@@ -129,6 +147,10 @@ export class LcuConnector extends EventEmitter<LcuEvents> {
   private openSocket(): void {
     if (!this.creds) return
     const { port, password, protocol } = this.creds
+    // Jamais deux sockets en parallèle : l'ancien émettrait des événements en double.
+    const previous = this.ws
+    this.ws = null
+    previous?.close()
     const ws = new WebSocket(`${protocol === 'https' ? 'wss' : 'ws'}://127.0.0.1:${port}/`, 'wamp', {
       headers: { Authorization: basicAuth(password) },
       rejectUnauthorized: false
@@ -136,6 +158,15 @@ export class LcuConnector extends EventEmitter<LcuEvents> {
     this.ws = ws
     ws.on('open', () => {
       for (const e of Object.values(EVENTS)) ws.send(JSON.stringify([5, e]))
+      // Les changements survenus pendant la reconnexion ne seront pas renvoyés : on relit l'état.
+      void this.get('/lol-gameflow/v1/gameflow-phase')
+        .then(async (phase) => {
+          if (typeof phase !== 'string') return
+          if (phase !== this.status.phase) this.setStatus({ ...this.status, phase })
+          if (phase === 'ChampSelect') this.setSession(await this.get('/lol-champ-select/v1/session').catch(() => null))
+          else if (this.lastSession) this.setSession(null)
+        })
+        .catch(() => undefined)
     })
     ws.on('message', (raw) => {
       try {
@@ -153,7 +184,10 @@ export class LcuConnector extends EventEmitter<LcuEvents> {
       }
     })
     ws.on('close', () => {
-      if (this.ws === ws) this.ws = null
+      if (this.ws !== ws) return
+      this.ws = null
+      // Client fermé ou redémarré : on le constate tout de suite plutôt qu'au prochain contrôle.
+      if (!this.stopped) void this.tick().catch(() => undefined)
     })
     ws.on('error', () => ws.close())
   }

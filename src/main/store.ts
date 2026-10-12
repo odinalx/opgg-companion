@@ -2,7 +2,7 @@
 // Le volume est faible (quelques centaines de games), un vrai SGBD n'apporte rien
 // et un module natif compliquerait le build Windows.
 
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 export class JsonFile<T> {
@@ -11,11 +11,20 @@ export class JsonFile<T> {
 
   constructor(
     private readonly path: string,
-    fallback: T
+    fallback: T,
+    private readonly saveDelayMs = 500
   ) {
     try {
       this.value = JSON.parse(readFileSync(path, 'utf8'))
     } catch {
+      // Fichier illisible (écriture interrompue…) : on le garde de côté plutôt que de l'écraser.
+      if (existsSync(path)) {
+        try {
+          copyFileSync(path, `${path}.bak`)
+        } catch {
+          /* sauvegarde impossible : on repart quand même des valeurs par défaut */
+        }
+      }
       this.value = fallback
     }
   }
@@ -36,15 +45,25 @@ export class JsonFile<T> {
 
   private scheduleSave(): void {
     if (this.timer) return
-    this.timer = setTimeout(() => this.flush(), 500)
+    this.timer = setTimeout(() => this.flush(), this.saveDelayMs)
   }
 
   flush(): void {
     if (this.timer) clearTimeout(this.timer)
     this.timer = null
     const tmp = `${this.path}.tmp`
-    writeFileSync(tmp, JSON.stringify(this.value))
-    renameSync(tmp, this.path) // écriture atomique
+    try {
+      writeFileSync(tmp, JSON.stringify(this.value))
+      renameSync(tmp, this.path) // écriture atomique
+    } catch {
+      // Fichier verrouillé un instant (antivirus, sauvegarde…) : on réessaie plus tard sans planter l'app.
+      try {
+        unlinkSync(tmp)
+      } catch {
+        /* pas de fichier temporaire */
+      }
+      this.scheduleSave()
+    }
   }
 }
 
@@ -57,9 +76,17 @@ interface CacheEntry {
 export class DiskCache {
   private readonly file: JsonFile<Record<string, CacheEntry>>
   private readonly inflight = new Map<string, Promise<unknown>>()
+  private writes = 0
 
-  constructor(path: string) {
-    this.file = new JsonFile(path, {})
+  /**
+   * @param maxEntries plafond d'entrées : au-delà, les plus anciennes sont retirées.
+   * Le fichier est réécrit en entier à chaque sauvegarde : les écritures sont regroupées (5 s).
+   */
+  constructor(
+    path: string,
+    private readonly maxEntries = 1500
+  ) {
+    this.file = new JsonFile(path, {}, 5000)
     this.prune()
   }
 
@@ -70,7 +97,10 @@ export class DiskCache {
     if (pending) return pending as Promise<T>
     const p = load()
       .then((v) => {
-        this.file.update((all) => ({ ...all, [key]: { t: Date.now(), v } }))
+        // Mutation en place : copier tout le cache à chaque ajout coûterait cher quand il grossit.
+        this.file.get()[key] = { t: Date.now(), v }
+        if (++this.writes % 100 === 0) this.prune()
+        this.file.set(this.file.get())
         return v
       })
       .finally(() => this.inflight.delete(key))
@@ -78,12 +108,17 @@ export class DiskCache {
     return p
   }
 
-  /** Supprime les entrées de plus de 7 jours pour borner la taille du fichier. */
-  private prune(): void {
+  get size(): number {
+    return Object.keys(this.file.get()).length
+  }
+
+  /** Retire les entrées de plus de 7 jours, puis les plus anciennes au-delà du plafond. */
+  prune(): void {
     const limit = Date.now() - 7 * 24 * 3600_000
-    const all = this.file.get()
-    const kept = Object.fromEntries(Object.entries(all).filter(([, e]) => e.t > limit))
-    if (Object.keys(kept).length !== Object.keys(all).length) this.file.set(kept)
+    const entries = Object.entries(this.file.get()).filter(([, e]) => e.t > limit)
+    entries.sort((a, b) => b[1].t - a[1].t)
+    const kept = entries.slice(0, this.maxEntries)
+    if (kept.length !== Object.keys(this.file.get()).length) this.file.set(Object.fromEntries(kept))
   }
 
   flush(): void {

@@ -1,14 +1,17 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { REGIONS, type Region } from '@shared/types'
 import { type Page, useApp } from './store'
 import { Button, Notice } from './components/ui'
 import { Glyph } from './components/Glyphs'
 import { ProfileIcon } from './components/Icons'
-import { ProfilePage } from './pages/Profile'
-import { MatchesPage } from './pages/Matches'
-import { StatsPage } from './pages/Stats'
-import { DraftPage } from './pages/Draft'
-import { SettingsPage } from './pages/Settings'
+import { Spinner } from './components/ui'
+
+// Chaque page n'est chargée qu'à sa première ouverture (Stats embarque la bibliothèque de graphiques).
+const ProfilePage = lazy(() => import('./pages/Profile').then((m) => ({ default: m.ProfilePage })))
+const MatchesPage = lazy(() => import('./pages/Matches').then((m) => ({ default: m.MatchesPage })))
+const StatsPage = lazy(() => import('./pages/Stats').then((m) => ({ default: m.StatsPage })))
+const DraftPage = lazy(() => import('./pages/Draft').then((m) => ({ default: m.DraftPage })))
+const SettingsPage = lazy(() => import('./pages/Settings').then((m) => ({ default: m.SettingsPage })))
 import logo from './logo.svg'
 
 const NAV: Array<{ page: Page; label: string }> = [
@@ -32,7 +35,7 @@ export function App() {
 
   return (
     <div className="flex h-full">
-      <nav className="flex w-60 shrink-0 flex-col border-r border-line bg-night/70 px-4 py-6 backdrop-blur" aria-label="Navigation">
+      <nav className="flex w-60 shrink-0 flex-col border-r border-line bg-night/80 px-4 py-6" aria-label="Navigation">
         <div className="mb-9 flex items-center gap-3 px-2">
           <img src={logo} alt="" className="h-10 w-10" />
           <div className="leading-tight">
@@ -76,13 +79,13 @@ export function App() {
           {needsAccount ? (
             <SignIn />
           ) : (
-            <>
+            <Suspense fallback={<Spinner />}>
               {page === 'profile' && <ProfilePage />}
               {page === 'matches' && <MatchesPage />}
               {page === 'stats' && <StatsPage />}
               {page === 'draft' && <DraftPage />}
               {page === 'settings' && <SettingsPage />}
-            </>
+            </Suspense>
           )}
         </div>
       </main>

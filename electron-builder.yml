@@ -29,3 +29,12 @@ nsis:
 portable:
   artifactName: OPGG-Companion-Portable-${version}.${ext}
 npmRebuild: false
+# Durcissement de l'exécutable Electron : pas de mode Node ni d'inspecteur activables de l'extérieur,
+# code chargé uniquement depuis l'archive asar, dont l'intégrité est vérifiée.
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true

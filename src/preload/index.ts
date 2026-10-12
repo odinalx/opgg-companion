@@ -20,6 +20,7 @@ const methods: ApiMethod[] = [
   'importBuild',
   'getOverlayState',
   'setOverlayEditing',
+  'checkShortcut',
   'isInGame',
   'getMatchupBuild',
   'getProBuilds',
@@ -48,5 +49,6 @@ contextBridge.exposeInMainWorld('api', {
   onAutoImport: (cb) => subscribe('build:auto-imported', cb),
   onOverlayStats: (cb) => subscribe('overlay:stats', cb),
   onOverlayUi: (cb) => subscribe('overlay:ui', cb),
-  onOverlaySettings: (cb) => subscribe('overlay:settings', cb)
+  onOverlaySettings: (cb) => subscribe('overlay:settings', cb),
+  onSettings: (cb) => subscribe('settings:changed', cb)
 } satisfies Api)

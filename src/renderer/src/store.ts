@@ -31,6 +31,7 @@ export const useApp = create<AppState>((set, get) => ({
     ])
     set({ status, settings, account })
     window.api.getStatic().then((staticData) => set({ staticData }), () => undefined)
+    window.api.onSettings((settings) => set({ settings }))
     window.api.onClientStatus((s) => {
       set({ status: s })
       void get().refreshAccount()

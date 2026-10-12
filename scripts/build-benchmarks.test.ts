@@ -20,7 +20,7 @@ const SEEDS: Record<Tier, string[]> = {
   IRON: ['Supbodor#EUW', 'sm3x#EUW', 'PeterSuchtFeta#W33D', 'BanglyRevolution#EUW', 'RamrodInfanterie#EUW', 'xxJL02xx#EUW', 'KCyphers#EUW', 'xNeelia#001', 'BabyBoy#1013', 'Mayrim11#EUW'],
   BRONZE: ['ExoSkeleton20#EUW', 'Fruk0sty#EUW', 'teomaltezos#EUW', 'Dopni#womp', 'Jonhwind#EUW', 'Nepomuk#NEP0', 'FoxBlood21#EUW', 'TerssaT#7457', 'Tuny#6961', 'Niklot#KAO'],
   SILVER: ['fernandotorres9#EUW', 'Disnasty#EUW', 'TYRANT#3507', 'Loki#GG69', 'KiTSOUNE#420', 'VexInFlex#Vex', 'Hulle#1123', 'MatteoBigD#7351', 'An0my#EUW', 'SpielNur#Spiel'],
-  GOLD: ['Joueur#EUW', 'LegolasX3#EUW', 'Roary#187', 'DaddyAdi#woof', 'Hulangangster443#EUW', 'Toki#Xzy', 'Alicion Thor#EUW', 'Yoomama op#EUW', 'Don alae#EUW', 'Why flame me#123'],
+  GOLD: ['LegolasX3#EUW', 'Roary#187', 'DaddyAdi#woof', 'Hulangangster443#EUW', 'Toki#Xzy', 'Alicion Thor#EUW', 'Yoomama op#EUW', 'Don alae#EUW', 'Why flame me#123'],
   PLATINUM: ['demon01#8249', 'DavyKun#Esp', 'Etharmethat#EUW', 'LostauBoyI#EUW', 'derty 820#EUW', 'Shadows Peak#EUW', 'Kuk0st#EUW', 'Afrika Gunnar#123', 'TheArmanFighter#EUW', 'MRumpelinho#EUW'],
   EMERALD: ['BIRDPERSON#B1RD', 'fricsone59#EUW', 'I AFK For Fun#FUN', 'Tahmas#Kench', 'issulia#EUW', 'Pumuskel#EUW', 'RedKingShaNx#EUW', 'Nutellamonsteret#EUW', 'Simon#TSG', 'Shirou Emiya#3675'],
   DIAMOND: ['michal aniol#EUW', 'Meemd#EUW', 'Lurven#000', 'Garbage Garry#000', 'Lv99 Zekrom#storm', 'Seasoned Feet#CHEF', 'FirskoB#EUW', 'Nalasaurus#EUW', 'Swain#So1', 'ODE Npunkt#111'],

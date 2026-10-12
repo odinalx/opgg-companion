@@ -217,8 +217,8 @@ function ModelSection({ useModel, onToggle }: { useModel: boolean; onToggle: (v:
 }
 
 const METRIC_LABELS: Record<OverlayMetric, string> = {
-  cs: 'CS et repères à 10, 15 et 20 min (médiane de ton elo)',
-  vision: 'Score de vision par minute (comparé à ton elo)',
+  cs: 'CS par minute et écart avec la médiane de ton elo',
+  vision: 'Score de vision par minute et écart avec la médiane de ton elo',
   gold: 'Or estimé par minute',
   kp: 'Participation aux kills'
 }
@@ -378,8 +378,22 @@ function ScoreboardCalibration({ o, set }: { o: OverlaySettings; set: (p: Partia
 }
 
 /** Champ qui enregistre la combinaison de touches pressée (format des raccourcis Electron). */
+/** Nom de touche au format des raccourcis Electron, selon la disposition du clavier (AZERTY compris). */
+function acceleratorKey(e: React.KeyboardEvent): string | null {
+  if (/^[a-z0-9]$/i.test(e.key)) return e.key.toUpperCase()
+  if (e.code.startsWith('Digit')) return e.code.slice(5) // chiffres de la rangée du haut, même en AZERTY
+  if (e.key === ' ') return 'Space'
+  const named: Record<string, string> = { ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right' }
+  if (named[e.key]) return named[e.key]
+  if (/^F([1-9]|1[0-9]|2[0-4])$/.test(e.key)) return e.key
+  if (/^[;,./\\'`[\]=-]$/.test(e.key)) return e.key
+  return null
+}
+
+/** Champ qui enregistre la combinaison de touches pressée et prévient si elle est inutilisable. */
 function HotkeyInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   const [recording, setRecording] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   return (
     <label className="text-sm">
       <span className="mb-1 block text-mute">{label}</span>
@@ -390,16 +404,22 @@ function HotkeyInput({ label, value, onChange }: { label: string; value: string;
         onBlur={() => setRecording(false)}
         onKeyDown={(e) => {
           e.preventDefault()
-          if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return
+          if (['Control', 'Shift', 'Alt', 'Meta', 'AltGraph'].includes(e.key)) return
           if (e.key === 'Escape') return (e.target as HTMLInputElement).blur()
           const mods = [e.ctrlKey && 'Control', e.altKey && 'Alt', e.shiftKey && 'Shift'].filter(Boolean)
           if (!mods.length) return // un raccourci global sans modificateur gênerait la partie
-          const key = e.code.startsWith('Key') ? e.code.slice(3) : e.code.startsWith('Digit') ? e.code.slice(5) : e.key.length === 1 ? e.key.toUpperCase() : e.key
-          onChange([...mods, key].join('+'))
+          const key = acceleratorKey(e)
+          if (!key) return setError('Touche non prise en charge, choisis-en une autre.')
+          const accel = [...mods, key].join('+')
           ;(e.target as HTMLInputElement).blur()
+          void window.api.checkShortcut(accel).then((problem) => {
+            setError(problem)
+            if (!problem) onChange(accel)
+          })
         }}
-        className="field w-full cursor-pointer px-3 py-2"
+        className={`field w-full cursor-pointer px-3 py-2 ${error ? 'border-loss' : ''}`}
       />
+      {error && <span className="mt-1 block text-xs text-loss">{error}</span>}
     </label>
   )
 }

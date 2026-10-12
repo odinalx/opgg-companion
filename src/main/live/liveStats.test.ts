@@ -34,7 +34,7 @@ describe('computeLiveStats', () => {
     expect(s.lanes.find((l) => l.position === 'jungle')).toMatchObject({ diff: -400, mine: true, enemy: '?' })
     expect(s.lanes.find((l) => l.position === 'top')?.diff).toBe(-500)
     expect(s.teamGoldDiff).toBe(4100 - 5000)
-    expect(s.nextMilestone?.minute).toBe(20)
+    expect(s.bench?.csPerMin).toBeGreaterThan(0) // médiane Or du jungler
   })
 
   it('renvoie null hors partie', () => {

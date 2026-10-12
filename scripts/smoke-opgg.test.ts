@@ -88,7 +88,7 @@ describe.runIf(process.env.SMOKE)('Builds matchup et high elo (réseau)', { time
   it('Nasus top contre Darius', async () => {
     const { AppService } = await import('../src/main/app')
     const app = new AppService(mkdtempSync(join(tmpdir(), 'opgg-app-')), () => undefined)
-    app.setSettings({ manualAccount: { gameName: 'Joueur', tagLine: 'EUW', region: 'EUW' }, region: 'EUW' })
+    app.setSettings({ manualAccount: { gameName: 'Hide on bush', tagLine: 'KR1', region: 'KR' }, region: 'KR' })
     const mu = await app.opgg.getMatchupBuild('Nasus', 'top', 'Darius')
     console.log('MATCHUP runes', mu.runePages.map((p) => `${p.perkNames[0]} / ${p.subName} (${p.games} games, ${Math.round(p.winRate * 100)}%)`))
     console.log('MATCHUP sorts', mu.spells.map((s) => `${s.names.join('+')} (${s.games})`), 'cores', mu.cores.map((c) => c.names.join(' > ')))

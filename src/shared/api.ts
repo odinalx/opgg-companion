@@ -61,6 +61,8 @@ export interface Api {
   getProBuilds(champion: string, position: Position, opponent: string | null): Promise<ProBuilds>
   importBuildData(build: ChampionBuild, parts: { runes?: boolean; spells?: boolean; items?: boolean }): Promise<ImportResult>
   setOverlayEditing(on: boolean): Promise<void>
+  /** null si le raccourci est utilisable, sinon la raison. */
+  checkShortcut(key: string): Promise<string | null>
   getOverlayState(): Promise<{ stats: LiveStats | null; ui: OverlayUi; settings: OverlaySettings }>
   isInGame(): Promise<boolean>
   getDisplays(): Promise<DisplayInfo[]>
@@ -73,6 +75,8 @@ export interface Api {
   onOverlayStats(cb: (s: LiveStats) => void): () => void
   onOverlayUi(cb: (ui: OverlayUi) => void): () => void
   onOverlaySettings(cb: (s: OverlaySettings) => void): () => void
+  /** Réglages modifiés ailleurs (par exemple une position déplacée depuis l'overlay). */
+  onSettings(cb: (s: Settings) => void): () => void
 }
 
 export type ApiMethod = Exclude<keyof Api, `on${string}`>

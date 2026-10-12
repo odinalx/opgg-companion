@@ -46,10 +46,11 @@ export function BuildPanel({
     setChosen(true)
     setTab(t)
   }
-  // Les builds high elo sont longs à réunir la première fois : on les prépare dès l'ouverture.
+  // Les builds high elo demandent une trentaine d'appels la première fois : on ne les prépare
+  // qu'une fois le champion verrouillé (pas à chaque survol pendant la sélection).
   useEffect(() => {
-    void window.api.getProBuilds(champion, position, opponent).catch(() => undefined)
-  }, [champion, position, opponent])
+    if (locked) void window.api.getProBuilds(champion, position, opponent).catch(() => undefined)
+  }, [champion, position, opponent, locked])
   const connected = useApp((s) => s.status.connected)
   const [build, setBuild] = useState<ChampionBuild | null>(null)
   const [error, setError] = useState<string | null>(null)

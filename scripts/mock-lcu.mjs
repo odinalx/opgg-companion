@@ -52,7 +52,7 @@ const freshSession = () => {
   ;[roles[2], roles[swap]] = [roles[swap], roles[2]]
   return {
   localPlayerCellId: 2,
-  myTeam: roles.map((assignedPosition, cellId) => ({ cellId, championId: 0, championPickIntent: 0, assignedPosition })),
+  myTeam: roles.map((assignedPosition, cellId) => ({ cellId, championId: 0, championPickIntent: 0, assignedPosition, spell1Id: 14, spell2Id: 4 })),
   theirTeam: [5, 6, 7, 8, 9].map((cellId) => ({ cellId, championId: 0, assignedPosition: '' })),
   bans: { myTeamBans: [], theirTeamBans: [] },
   actions: []
@@ -63,7 +63,8 @@ let session = freshSession()
 let step = 0
 
 const routes = {
-  '/lol-gameflow/v1/gameflow-phase': () => 'ChampSelect',
+  // Avec MOCK_INGAME, la partie est en cours : l'overlay n'interroge l'API de jeu que dans cette phase.
+  '/lol-gameflow/v1/gameflow-phase': () => (process.env.MOCK_INGAME ? 'InProgress' : 'ChampSelect'),
   '/lol-summoner/v1/current-summoner': () => ({
     gameName: ACCOUNT.gameName,
     tagLine: ACCOUNT.tagLine,
@@ -183,7 +184,7 @@ if (process.env.MOCK_INGAME) {
       championName: champ,
       rawChampionName: `game_character_displayname_${key}`,
       team: 'ORDER',
-      position: 'TOP',
+      position: { top: 'TOP', jungle: 'JUNGLE', middle: 'MIDDLE', bottom: 'BOTTOM', utility: 'UTILITY' }[ACCOUNT.role] ?? 'TOP',
       level: Math.min(18, Math.floor(min / 1.4) + 1),
       items: [
         { itemID: 3078, price: 3333, count: 1 },
@@ -204,10 +205,16 @@ if (process.env.MOCK_INGAME) {
       scores: { kills, deaths: 2, assists: 3, creepScore: 0, wardScore: 0 }
     })
     const others = [
-      player('Allié#1', 'ORDER', 'JUNGLE', 'Lee Sin', 330, 3),
-      player('Allié#2', 'ORDER', 'MIDDLE', 'Ahri', 360, 4),
-      player('Allié#3', 'ORDER', 'BOTTOM', 'Jinx', 345, 2),
-      player('Allié#4', 'ORDER', 'UTILITY', 'Thresh', 200, 0),
+      // Alliés : un par rôle, sauf celui du joueur.
+      ...[
+        ['TOP', 'Garen', 340],
+        ['JUNGLE', 'Lee Sin', 330],
+        ['MIDDLE', 'Ahri', 360],
+        ['BOTTOM', 'Jinx', 345],
+        ['UTILITY', 'Thresh', 200]
+      ]
+        .filter(([pos]) => pos !== me.position)
+        .map(([pos, name, rate], i) => player(`Allié#${i + 1}`, 'ORDER', pos, name, rate, 3)),
       player('Ennemi#1', 'CHAOS', 'TOP', 'Darius', 330, 3),
       player('Ennemi#2', 'CHAOS', 'JUNGLE', 'Vi', 300, 2),
       player('Ennemi#3', 'CHAOS', 'MIDDLE', 'Zed', 395, 5),

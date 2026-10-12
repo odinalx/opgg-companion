@@ -33,6 +33,9 @@ export function arrangeSpells(recommended: number[], current: [number, number]):
   return [a, b]
 }
 
+/** « Core (57% WR) » quand le winrate est connu, sinon « Core ». */
+const withWr = (label: string, winRate: number): string => (winRate > 0 ? `${label} (${Math.round(winRate * 100)}% WR)` : label)
+
 export function itemSetBody(build: ChampionBuild) {
   const champ = championByName(build.champion)
   const block = (type: string, ids: number[]) => ({
@@ -40,9 +43,9 @@ export function itemSetBody(build: ChampionBuild) {
     items: ids.map((id) => ({ id: String(id), count: 1 }))
   })
   const blocks = [
-    build.starter && block(`Départ (${Math.round(build.starter.winRate * 100)}% WR)`, build.starter.ids),
+    build.starter && block(withWr('Départ', build.starter.winRate), build.starter.ids),
     build.boots && block('Bottes', build.boots.ids),
-    build.core && block(`Core (${Math.round(build.core.winRate * 100)}% WR)`, build.core.ids),
+    build.core && block(withWr('Core', build.core.winRate), build.core.ids),
     build.fourth.length && block('4e item, au choix', build.fourth.flatMap((o) => o.ids)),
     build.fifth.length && block('5e item, au choix', build.fifth.flatMap((o) => o.ids)),
     build.sixth.length && block('6e item, au choix', build.sixth.flatMap((o) => o.ids))

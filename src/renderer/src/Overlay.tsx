@@ -46,7 +46,8 @@ export function Overlay() {
   }
   const move = (id: OverlayWidget) => (p: WidgetPosition) => save({ positions: { ...pos, [id]: p } })
 
-  const csDelta = stats.bench ? Math.round(stats.cs - stats.csExpected) : null
+  // Écart de CS/min avec la médiane de ton elo pour ton rôle.
+  const csRateDelta = stats.bench ? stats.csPerMin - stats.bench.csPerMin : null
   const visionDelta = stats.bench ? stats.visionPerMin - stats.bench.visionPerMin : null
 
   return (
@@ -54,23 +55,18 @@ export function Overlay() {
       {editing && <EditBar settings={settings} onReset={() => save({ positions: DEFAULT_POSITIONS, scoreboard: { ...settings.scoreboard, x: 50, y: 38 } })} />}
 
       {m.cs && (
-        <Movable label="CS" pos={pos.cs} editing={editing} onMove={move('cs')}>
+        <Movable label="CS/min" pos={pos.cs} editing={editing} onMove={move('cs')}>
           <p className={`text-[13px] text-white ${SHADOW}`}>
-            <span className="num text-lg font-bold">{stats.cs}</span> CS {csDelta !== null && <Delta value={csDelta} />}
-            {stats.nextMilestone && (
-              <span className="text-white/60">
-                {' '}
-                · {stats.nextMilestone.minute}' : {stats.nextMilestone.expected}
-              </span>
-            )}
+            <span className="num text-lg font-bold">{stats.csPerMin.toFixed(1)}</span> CS/min{' '}
+            {csRateDelta !== null && <Delta value={csRateDelta} digits={1} />}
           </p>
         </Movable>
       )}
       {m.vision && (
         <Movable label="Vision" pos={pos.vision} editing={editing} onMove={move('vision')}>
           <p className={`text-[13px] text-white ${SHADOW}`}>
-            <span className="num text-lg font-bold">{stats.vision}</span> vision{' '}
-            {visionDelta !== null && <Delta value={visionDelta * 10} digits={1} />}
+            <span className="num text-lg font-bold">{stats.visionPerMin.toFixed(1)}</span> vision/min{' '}
+            {visionDelta !== null && <Delta value={visionDelta} digits={1} />}
           </p>
         </Movable>
       )}
@@ -100,7 +96,7 @@ export function Overlay() {
 
       {(ui.showBuild || editing) && stats.position && (
         <Movable label="Build" pos={pos.build} editing={editing} onMove={move('build')}>
-          <div className="w-[26rem] rounded-2xl border border-white/10 bg-night/85 p-5 shadow-2xl backdrop-blur-md">
+          <div className="w-[26rem] rounded-2xl border border-white/10 bg-night/90 p-5 shadow-2xl">
             <BuildSummary champion={stats.champion} position={stats.position} />
           </div>
         </Movable>
@@ -381,7 +377,6 @@ function LiveWindow({ stats: s, settings }: { stats: LiveStats | null; settings:
     )
   const m = settings.metrics
   const clock = `${Math.floor(s.gameTime / 60)}:${String(Math.floor(s.gameTime % 60)).padStart(2, '0')}`
-  const csDelta = s.bench ? Math.round(s.cs - s.csExpected) : null
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-5">
       <div className="flex items-baseline justify-between">
@@ -391,9 +386,9 @@ function LiveWindow({ stats: s, settings }: { stats: LiveStats | null; settings:
       </div>
       <div className="grid grid-cols-2 gap-3">
         {m.cs && (
-          <Tile label={`CS · ${s.csPerMin.toFixed(1)}/min (médiane ${s.bench?.csPerMin.toFixed(1) ?? '—'})`}>
-            {s.cs}
-            {csDelta !== null && <Delta value={csDelta} />}
+          <Tile label={`CS/min (médiane ${TIER_LABELS[s.tier]} : ${s.bench?.csPerMin.toFixed(1) ?? '—'})`}>
+            {s.csPerMin.toFixed(1)}
+            {s.bench && <Delta value={s.csPerMin - s.bench.csPerMin} digits={1} />}
           </Tile>
         )}
         {m.vision && (
@@ -404,20 +399,6 @@ function LiveWindow({ stats: s, settings }: { stats: LiveStats | null; settings:
         {m.gold && <Tile label="Or estimé par minute">{Math.round(s.goldPerMin)}</Tile>}
         {m.kp && <Tile label="Participation aux kills">{Math.round(s.killParticipation * 100)}%</Tile>}
       </div>
-      {(s.milestones.length > 0 || s.nextMilestone) && (
-        <div className="flex flex-wrap gap-2 text-sm">
-          {s.milestones.map((ms) => (
-            <span key={ms.minute} className={`rounded-lg px-2 py-1 ${ms.cs >= ms.expected ? 'bg-ok/15 text-ok' : 'bg-loss/15 text-loss'}`}>
-              {ms.minute} min : {ms.cs} CS / {ms.expected} attendus
-            </span>
-          ))}
-          {s.nextMilestone && (
-            <span className="rounded-lg bg-white/5 px-2 py-1 text-soft">
-              Objectif {s.nextMilestone.minute} min : {s.nextMilestone.expected} CS
-            </span>
-          )}
-        </div>
-      )}
       {settings.goldDiffOnTab && (
         <GoldDiff stats={s} />
       )}

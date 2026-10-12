@@ -4,10 +4,8 @@
 
 import type { LaneGold, LiveStats, Position, Tier } from '@shared/types'
 import { POSITIONS } from '@shared/types'
-import { benchmark, expectedCs } from '../benchmarks'
+import { benchmark } from '../benchmarks'
 import { championByName } from '../ddragon'
-
-export const MILESTONES = [10, 15, 20]
 
 function livePosition(p: string | undefined): Position | null {
   switch ((p ?? '').toUpperCase()) {
@@ -54,8 +52,6 @@ export function computeLiveStats(data: any, tier: Tier): LiveStats | null {
   const goldEarned = itemsValue(me) + currentGold
   const position = livePosition(me.position)
   const bench = benchmark(tier, position ?? 'mid')
-  const rate = bench?.csPerMin ?? 0
-  const next = MILESTONES.find((m) => m * 60 > gameTime)
 
   // Écart d'or par lane : valeur des items de chaque joueur (l'or en poche des autres est inconnu).
   const lanes: LaneGold[] = POSITIONS.map((pos) => {
@@ -79,9 +75,6 @@ export function computeLiveStats(data: any, tier: Tier): LiveStats | null {
     csPerMin: (sc.creepScore ?? 0) / minutes,
     tier,
     bench,
-    csExpected: expectedCs(rate, minutes),
-    nextMilestone: next && rate ? { minute: next, expected: Math.round(expectedCs(rate, next)) } : null,
-    milestones: [],
     visionPerMin: (sc.wardScore ?? 0) / minutes,
     lanes,
     side: me.team === 'CHAOS' ? 'red' : 'blue',

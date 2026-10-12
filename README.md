@@ -72,8 +72,8 @@ L'import automatique des runes et des sorts au verrouillage s'active dans les r�
 |---|---|
 | ![Overlay](docs/screenshots/overlay.jpg) | ![Écart d'or](docs/screenshots/overlay-tab.jpg) |
 
-- **Overlay minimal** : quelques chiffres seulement. Tes CS, comparés à la médiane de ton elo à la même minute, avec les
-  repères à 10, 15 et 20 minutes ; ton score de vision ; en option, l'or par minute et la participation aux kills.
+- **Overlay minimal** : quelques chiffres seulement. Tes CS par minute et l'écart avec la médiane de ton elo pour ton rôle ;
+  ton score de vision ; en option, l'or par minute et la participation aux kills.
 - **Écart d'or sur le tableau des scores** : quand tu maintiens Tab, l'écart de chaque lane s'affiche sur la ligne centrale
   du tableau, dans la couleur de l'équipe qui mène.
 - **Build à la demande** : `Ctrl + Shift + B`.
@@ -98,6 +98,19 @@ Les raccourcis se changent dans les réglages.
   moyen de la partie. Le score de vision n'étant pas fourni par OP.GG, ses repères sont estimés.
 - **Écriture dans le client** : l'app ne touche au client LoL que pour importer runes, sorts et sets d'items, et seulement
   quand tu le demandes (ou si tu actives l'import automatique). Elle n'automatise aucune action de jeu.
+
+## Sécurité et consommation
+
+- L'app ne contacte qu'OP.GG (statistiques), Riot Data Dragon (icônes) et, en local, le client LoL et l'API de jeu.
+  Aucune donnée n'est envoyée ailleurs ; ton historique et tes réglages restent dans le dossier de l'app sur ton PC.
+- Les pages de l'app ne peuvent ni naviguer vers un site extérieur ni ouvrir de fenêtre ; les appels internes ne sont
+  acceptés que depuis l'app et leurs données sont vérifiées.
+- L'exécutable est durci (fuses Electron : pas de mode Node ni d'inspecteur activables de l'extérieur, intégrité de
+  l'archive vérifiée).
+- Au repos, l'app ne fait presque rien : recherche du client LoL par simple lecture de fichier, l'API de jeu n'est
+  interrogée que pendant une partie. La fenêtre d'overlay ne charge que son propre code.
+- `npm audit` : aucune faille dans les dépendances livrées. La seule alerte (modérée) concerne un outil de build
+  qui n'est pas inclus dans l'app.
 
 ## Développement
 

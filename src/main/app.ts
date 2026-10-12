@@ -71,7 +71,9 @@ export class AppService {
 
     this.lcu.on('status', (s) => {
       this.emit('client:status', s)
-      if (s.account) this.settings.update((cur) => ({ ...cur, region: s.account!.region }))
+      // N'écrit les réglages que si la région change (les statuts arrivent à chaque changement de phase).
+      if (s.account && s.account.region !== this.settings.get().region)
+        this.settings.update((cur) => ({ ...cur, region: s.account!.region }))
     })
     this.lcu.on('champSelect', (session) => {
       this.emit('draft:live', session ? sessionToDraft(session, this.lcu.getQueueId()) : null)

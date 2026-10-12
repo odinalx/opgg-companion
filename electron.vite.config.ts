@@ -17,6 +17,8 @@ export default defineConfig({
   },
   renderer: {
     plugins: [react(), tailwindcss()],
+    // electron-vite ne minifie pas le renderer par défaut : moins de code à charger et à parser.
+    build: { minify: true },
     resolve: { alias: { ...shared, '@': resolve('src/renderer/src') } }
   }
 })
