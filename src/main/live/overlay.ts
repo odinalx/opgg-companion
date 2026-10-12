@@ -137,6 +137,8 @@ export class OverlayManager {
       this.misses = 0
       if (this.stats && this.getSettings().enabled && !this.closedByUser) {
         this.ensureWindow()
+        // Le jeu peut repasser au premier plan : on remet l'overlay au-dessus, sans l'activer.
+        if (this.mode === 'overlay' && this.win && !this.win.isDestroyed()) this.win.setAlwaysOnTop(true, 'screen-saver')
         this.win?.webContents.send('overlay:stats', this.stats)
       }
     } catch {
@@ -169,6 +171,7 @@ export class OverlayManager {
         height,
         minWidth: 380,
         title: 'OPGG Companion – En jeu',
+        show: false, // affichée sans activation : la partie garde le focus
         backgroundColor: '#080c14',
         autoHideMenuBar: true,
         webPreferences
@@ -184,6 +187,7 @@ export class OverlayManager {
         skipTaskbar: true,
         hasShadow: false,
         title: 'OPGG Companion Overlay',
+        show: false, // jamais activée : les clics et le clavier restent au jeu
         backgroundColor: '#00000000',
         webPreferences
       })
@@ -199,8 +203,8 @@ export class OverlayManager {
       }
     })
     this.load(win)
-    if (s.mode === 'window') win.show()
-    else win.showInactive()
+    // Dans les deux modes, la fenêtre apparaît sans prendre le focus du jeu.
+    win.once('ready-to-show', () => win.showInactive())
     this.win = win
   }
 

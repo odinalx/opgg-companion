@@ -43,7 +43,9 @@ export function Overlay() {
   return (
     <div className="pointer-events-none fixed inset-0 select-none">
       <Hud stats={stats} settings={settings} />
-      {ui.tabHeld && settings.goldDiffOnTab && <GoldDiff stats={stats} />}
+      {settings.goldDiffOnTab && (ui.tabHeld || settings.scoreboard.calibrate) && (
+        <ScoreboardGold stats={stats} layout={settings.scoreboard} />
+      )}
       {ui.showBuild && stats.position && (
         <div className="fixed top-1/2 right-6 w-[26rem] -translate-y-1/2 rounded-2xl border border-white/10 bg-night/85 p-5 shadow-2xl backdrop-blur-md">
           <BuildSummary champion={stats.champion} position={stats.position} />
@@ -53,88 +55,100 @@ export function Overlay() {
   )
 }
 
+/**
+ * HUD minimal : quelques chiffres en texte ombré, sans cadre, pour ne pas gêner la lecture du jeu.
+ * Couleur uniquement sur l'écart à la médiane de ton elo.
+ */
 function Hud({ stats: s, settings }: { stats: LiveStats; settings: OverlaySettings }) {
   const m = settings.metrics
-  const tier = TIER_LABELS[s.tier]
   const csDelta = s.bench ? Math.round(s.cs - s.csExpected) : null
   const visionDelta = s.bench ? s.visionPerMin - s.bench.visionPerMin : null
-  return (
-    <div className={`fixed ${CORNER[settings.corner]} w-[19rem] rounded-2xl border border-white/10 bg-night/80 p-3 shadow-2xl backdrop-blur-md`}>
-      <div className="flex items-center gap-2.5">
-        <ChampIcon name={s.champion} size={34} className="rounded-lg" />
-        <p className="text-xs text-mute">
-          Comparé à la médiane <span className="font-semibold text-soft">{tier}</span>
-          {s.position ? ` · ${positionLabel(s.position)}` : ''}
-        </p>
-      </div>
-
-      {m.cs && (
-        <div className="mt-3">
-          <div className="flex items-baseline gap-2">
-            <p className="num text-3xl leading-none font-bold">{s.cs}</p>
-            <p className="text-sm text-soft">CS · {s.csPerMin.toFixed(1)}/min</p>
-            {csDelta !== null && <Delta value={csDelta} suffix=" CS" />}
-          </div>
-          <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px]">
-            {s.milestones.map((ms) => (
-              <span key={ms.minute} className={`rounded-md px-1.5 py-0.5 ${ms.cs >= ms.expected ? 'bg-ok/15 text-ok' : 'bg-loss/15 text-loss'}`}>
-                {ms.minute}' : {ms.cs}/{ms.expected}
-              </span>
-            ))}
-            {s.nextMilestone && (
-              <span className="rounded-md bg-white/5 px-1.5 py-0.5 text-soft">
-                objectif {s.nextMilestone.minute}' : {s.nextMilestone.expected} CS
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {m.vision && (
-        <div className="mt-3 flex items-baseline gap-2">
-          <p className="num text-2xl leading-none font-bold">{s.vision}</p>
-          <p className="text-sm text-soft">vision · {s.visionPerMin.toFixed(2)}/min</p>
-          {visionDelta !== null && <Delta value={visionDelta} digits={2} suffix="/min" />}
-        </div>
-      )}
-
-      {(m.gold || m.kp) && (
-        <div className="mt-3 flex gap-4 text-sm">
-          {m.gold && (
-            <p>
-              <span className="num text-lg font-bold">{Math.round(s.goldPerMin)}</span> <span className="text-soft">or/min</span>
-            </p>
-          )}
-          {m.kp && (
-            <p>
-              <span className="num text-lg font-bold">{Math.round(s.killParticipation * 100)}%</span>{' '}
-              <span className="text-soft">participation</span>
-            </p>
-          )}
-        </div>
-      )}
-
-      <p className="mt-3 border-t border-white/10 pt-2 text-[11px] text-mute">
-        {settings.goldDiffOnTab ? 'Tab : écart d\'or par lane · ' : ''}
-        {pretty(settings.buildKey)} : build
+  const lines = [
+    m.cs && (
+      <p key="cs">
+        <span className="num text-lg font-bold">{s.cs}</span> CS {csDelta !== null && <Delta value={csDelta} />}
+        {s.nextMilestone && <span className="text-white/60"> · {s.nextMilestone.minute}' : {s.nextMilestone.expected}</span>}
       </p>
+    ),
+    m.vision && (
+      <p key="vision">
+        <span className="num text-lg font-bold">{s.vision}</span> vision{' '}
+        {visionDelta !== null && <Delta value={visionDelta * 10} digits={1} />}
+      </p>
+    ),
+    m.gold && (
+      <p key="gold">
+        <span className="num text-lg font-bold">{Math.round(s.goldPerMin)}</span> or/min
+      </p>
+    ),
+    m.kp && (
+      <p key="kp">
+        <span className="num text-lg font-bold">{Math.round(s.killParticipation * 100)}%</span> KP
+      </p>
+    )
+  ].filter(Boolean)
+  if (!lines.length) return null
+  return (
+    <div
+      className={`fixed ${CORNER[settings.corner]} text-right text-[13px] leading-tight text-white [text-shadow:0_1px_2px_#000,0_0_6px_#000]`}
+      title={`Comparé à la médiane ${TIER_LABELS[s.tier]}`}
+    >
+      {lines}
     </div>
   )
 }
 
-function Delta({ value, digits = 0, suffix = '' }: { value: number; digits?: number; suffix?: string }) {
+function Delta({ value, digits = 0 }: { value: number; digits?: number }) {
   const up = value >= 0
   return (
-    <span className={`num ml-auto text-base font-semibold ${up ? 'text-ok' : 'text-loss'}`}>
+    <span className={`num font-semibold ${up ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>
       {up ? '+' : '−'}
       {Math.abs(value).toFixed(digits)}
-      {suffix}
     </span>
   )
 }
 
-/** Écart d'or par lane (valeur des items), dans la couleur du côté qui mène — à la manière des overlays du marché. */
-function GoldDiff({ stats: s, embedded }: { stats: LiveStats; embedded?: boolean }) {
+/**
+ * Écarts d'or posés sur la ligne centrale du tableau des scores du jeu (Tab), une ligne par
+ * lane : seulement le chiffre, dans la couleur du côté qui mène, une flèche vers le plus riche.
+ */
+function ScoreboardGold({ stats: s, layout }: { stats: LiveStats; layout: OverlaySettings['scoreboard'] }) {
+  const enemySide = s.side === 'blue' ? 'red' : 'blue'
+  // Par défaut ton équipe est à gauche du tableau.
+  const allyLeft = !layout.swapSides
+  const label = (diff: number, top: number, key: string, small?: boolean) => {
+    if (Math.abs(diff) < 100)
+      return (
+        <span key={key} className="absolute -translate-x-1/2 -translate-y-1/2 text-white/50" style={{ left: `${layout.x}%`, top: `${top}%` }}>
+          =
+        </span>
+      )
+    const allyRicher = diff > 0
+    const side = allyRicher ? s.side : enemySide
+    const pointsLeft = allyRicher === allyLeft
+    const text = Math.abs(diff).toLocaleString('fr-FR')
+    return (
+      <span
+        key={key}
+        className={`num absolute -translate-x-1/2 -translate-y-1/2 font-bold whitespace-nowrap ${small ? 'text-sm' : 'text-base'} ${
+          side === 'blue' ? 'text-[#60a5fa]' : 'text-[#f87171]'
+        }`}
+        style={{ left: `${layout.x}%`, top: `${top}%` }}
+      >
+        {pointsLeft ? `‹ ${text}` : `${text} ›`}
+      </span>
+    )
+  }
+  return (
+    <div className="fixed inset-0 [text-shadow:0_1px_2px_#000,0_0_4px_#000]">
+      {label(s.teamGoldDiff, layout.y - layout.spacing, 'team', true)}
+      {s.lanes.map((l, i) => (l.ally && l.enemy ? label(l.diff, layout.y + i * layout.spacing, l.position) : null))}
+    </div>
+  )
+}
+
+/** Mode fenêtre : tableau des écarts d'or par lane (valeur des items), dans la couleur du côté qui mène. */
+function GoldDiff({ stats: s }: { stats: LiveStats }) {
   const enemySide = s.side === 'blue' ? 'red' : 'blue'
   const color = (side: 'blue' | 'red') => (side === 'blue' ? 'text-win' : 'text-loss')
   const row = (diff: number) => {
@@ -144,15 +158,11 @@ function GoldDiff({ stats: s, embedded }: { stats: LiveStats; embedded?: boolean
   }
   return (
     <div
-      className={
-        embedded
-          ? 'card px-4 py-3'
-          : 'fixed top-24 left-1/2 w-[22rem] -translate-x-1/2 rounded-2xl border border-white/10 bg-night/85 px-4 py-3 shadow-2xl backdrop-blur-md'
-      }
+      className="card px-4 py-3"
     >
       <p className="mb-2 text-center text-xs text-mute">Écart d'or estimé (valeur des items)</p>
       <ul className="flex flex-col gap-1">
-        {s.lanes.map((l) => (
+        {s.lanes.filter((l) => l.ally || l.enemy).map((l) => (
           <li key={l.position} className={`grid grid-cols-[2rem_1fr_4.5rem_1fr_2rem] items-center gap-2 rounded-lg px-1 py-0.5 ${l.mine ? 'bg-white/5' : ''}`}>
             <ChampIcon name={l.ally} size={28} className={`rounded-md ring-2 ${s.side === 'blue' ? 'ring-win/70' : 'ring-loss/70'}`} />
             <span className="text-xs text-soft">{positionLabel(l.position)}</span>
@@ -304,7 +314,7 @@ function LiveWindow({ stats: s, settings }: { stats: LiveStats | null; settings:
         </div>
       )}
       {settings.goldDiffOnTab && (
-        <GoldDiff stats={s} embedded />
+        <GoldDiff stats={s} />
       )}
       {s.position && (
         <div className="card p-5">

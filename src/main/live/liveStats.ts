@@ -68,7 +68,7 @@ export function computeLiveStats(data: any, tier: Tier): LiveStats | null {
       diff: (a ? itemsValue(a) : 0) - (e ? itemsValue(e) : 0),
       mine: pos === position
     }
-  }).filter((l) => l.ally || l.enemy)
+  }) // toujours 5 lignes, dans l'ordre du tableau des scores (top → support)
 
   return {
     champion: championName(me),

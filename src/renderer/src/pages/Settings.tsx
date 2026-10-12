@@ -275,7 +275,7 @@ function OverlaySection() {
               onChange={(e) => set({ goldDiffOnTab: e.target.checked })}
               className="h-4 w-4 accent-[var(--color-accent)]"
             />
-            Écart d'or par lane en maintenant Tab
+            Écart d'or par lane sur le tableau des scores (Tab)
           </label>
         </div>
         <div className="flex flex-col gap-3">
@@ -319,7 +319,62 @@ function OverlaySection() {
           <HotkeyInput label="Afficher le build" value={o.buildKey} onChange={(buildKey) => set({ buildKey })} />
         </div>
       </fieldset>
+
+      {o.enabled && o.goldDiffOnTab && o.mode === 'overlay' && <ScoreboardCalibration o={o} set={set} />}
     </section>
+  )
+}
+
+/**
+ * Calage des écarts d'or sur le tableau des scores : la taille du tableau dépend de la
+ * résolution. En jeu, coche « afficher en continu » puis aligne les chiffres sur la ligne
+ * centrale du tableau (Tab) avec les curseurs ; l'overlay se met à jour en direct.
+ */
+function ScoreboardCalibration({ o, set }: { o: OverlaySettings; set: (p: Partial<OverlaySettings>) => void }) {
+  const sb = o.scoreboard
+  const setSb = (patch: Partial<OverlaySettings['scoreboard']>): void => set({ scoreboard: { ...sb, ...patch } })
+  const slider = (label: string, key: 'x' | 'y' | 'spacing', min: number, max: number, step: number) => (
+    <label className="text-sm">
+      <span className="flex justify-between text-mute">
+        {label} <span className="num text-base text-soft">{sb[key].toFixed(1)} %</span>
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={sb[key]}
+        onChange={(e) => setSb({ [key]: Number(e.target.value) })}
+        className="w-full accent-[var(--color-accent)]"
+      />
+    </label>
+  )
+  return (
+    <div className="card mt-5 p-4">
+      <h3 className="font-display text-lg font-bold">Position sur le tableau des scores</h3>
+      <p className="mt-1 text-sm text-soft">
+        À régler une fois : en partie, coche « afficher en continu », ouvre le tableau (Tab) et aligne les chiffres sur sa
+        ligne centrale, un par lane. Ta résolution change la taille du tableau.
+      </p>
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {slider('Horizontal', 'x', 30, 70, 0.1)}
+        {slider('1re ligne (top)', 'y', 15, 70, 0.1)}
+        {slider('Écart entre lignes', 'spacing', 3, 12, 0.1)}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-5 text-sm">
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={sb.calibrate} onChange={(e) => setSb({ calibrate: e.target.checked })} className="h-4 w-4 accent-[var(--color-accent)]" />
+          Afficher en continu (pour régler)
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={sb.swapSides} onChange={(e) => setSb({ swapSides: e.target.checked })} className="h-4 w-4 accent-[var(--color-accent)]" />
+          Mon équipe est à droite du tableau
+        </label>
+        <button className="text-mute underline-offset-2 hover:text-ink hover:underline" onClick={() => setSb({ x: 50, y: 38, spacing: 6.2 })}>
+          Position par défaut
+        </button>
+      </div>
+    </div>
   )
 }
 

@@ -58,7 +58,8 @@ export class AppService {
       overlay: {
         ...DEFAULT_SETTINGS.overlay,
         ...this.settings.get().overlay,
-        metrics: { ...DEFAULT_SETTINGS.overlay.metrics, ...this.settings.get().overlay?.metrics }
+        metrics: { ...DEFAULT_SETTINGS.overlay.metrics, ...this.settings.get().overlay?.metrics },
+        scoreboard: { ...DEFAULT_SETTINGS.overlay.scoreboard, ...this.settings.get().overlay?.scoreboard }
       }
     })
     this.matches = new JsonFile(dataPath(dataDir, 'matches.json'), {})

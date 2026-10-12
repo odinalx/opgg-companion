@@ -214,6 +214,7 @@ export const DEFAULT_SETTINGS: Settings = {
     displayId: null,
     metrics: { cs: true, vision: true, gold: false, kp: false },
     goldDiffOnTab: true,
+    scoreboard: { x: 50, y: 38, spacing: 6.2, swapSides: false, calibrate: false },
     corner: 'top-right',
     toggleKey: 'Control+Shift+H',
     buildKey: 'Control+Shift+B'
@@ -333,10 +334,26 @@ export interface OverlaySettings {
   displayId: number | null // écran de la fenêtre (null = écran principal)
   metrics: Record<OverlayMetric, boolean>
   goldDiffOnTab: boolean // écart d'or par lane tant que Tab est maintenu
+  scoreboard: ScoreboardLayout
   corner: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
   toggleKey: string // raccourci global (format Electron), ex. "Control+Shift+H"
   buildKey: string
 }
+
+/**
+ * Position des écarts d'or sur le tableau des scores (Tab) du jeu, en % de l'écran.
+ * Le tableau met les deux équipes côte à côte, une ligne par lane : les écarts se placent
+ * sur la ligne centrale. Réglable car la taille du tableau dépend de la résolution.
+ */
+export interface ScoreboardLayout {
+  x: number // centre horizontal (% de la largeur)
+  y: number // centre de la 1re ligne (% de la hauteur)
+  spacing: number // écart entre deux lignes (% de la hauteur)
+  swapSides: boolean // ton équipe affichée à droite au lieu de gauche
+  calibrate: boolean // affichage permanent pour régler la position
+}
+
+export const DEFAULT_SCOREBOARD: ScoreboardLayout = { x: 50, y: 38, spacing: 6.2, swapSides: false, calibrate: false }
 
 export const DEFAULT_OVERLAY: OverlaySettings = {
   enabled: true,
@@ -344,6 +361,7 @@ export const DEFAULT_OVERLAY: OverlaySettings = {
   displayId: null,
   metrics: { cs: true, vision: true, gold: false, kp: false },
   goldDiffOnTab: true,
+  scoreboard: DEFAULT_SCOREBOARD,
   corner: 'top-right',
   toggleKey: 'Control+Shift+H',
   buildKey: 'Control+Shift+B'
