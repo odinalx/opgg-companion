@@ -69,7 +69,7 @@ export class OpggClient {
   private async connect(): Promise<Client> {
     if (this.client) return this.client
     this.connecting ??= (async () => {
-      const client = new Client({ name: 'opgg-companion', version: '1.0.0' })
+      const client = new Client({ name: 'opgg-companion', version: '1.0.1' })
       await client.connect(new StreamableHTTPClientTransport(new URL(ENDPOINT)))
       this.client = client
       return client
