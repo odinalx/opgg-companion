@@ -1,0 +1,68 @@
+@import 'tailwindcss';
+@import '@fontsource/barlow/400.css';
+@import '@fontsource/barlow/500.css';
+@import '@fontsource/barlow/600.css';
+@import '@fontsource/barlow-condensed/500.css';
+@import '@fontsource/barlow-condensed/600.css';
+@import '@fontsource/barlow-condensed/700.css';
+
+@theme {
+  --color-night: #0e1522;
+  --color-panel: #162033;
+  --color-panel-2: #1c2840;
+  --color-line: #24324b;
+  --color-ink: #e6e9ef;
+  --color-mute: #8d99b0;
+  --color-gold: #c9a65a;
+  --color-win: #4c8dff;
+  --color-loss: #e0565b;
+  /* Une couleur par critère du draft helper, dans l'ordre d'empilement
+     (palette catégorielle validée contre le fond panel : CVD ΔE ≥ 8.4) */
+  --color-c-personal: #3987e5;
+  --color-c-mastery: #d95926;
+  --color-c-meta: #199e70;
+  --color-c-matchup: #c98500;
+  --color-c-synergy: #d55181;
+  --font-sans: 'Barlow', system-ui, sans-serif;
+  --font-display: 'Barlow Condensed', 'Barlow', sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-night);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+}
+
+.num {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
