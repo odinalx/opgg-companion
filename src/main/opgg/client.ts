@@ -4,6 +4,8 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type {
+  BuildOption,
+  ChampionBuild,
   MatchDetail,
   MatchParticipant,
   MatchSummary,
@@ -250,6 +252,70 @@ export class OpggClient {
       const table: MatchupTable = {}
       for (const c of r?.data?.counters ?? []) table[c.champion_name] = { play: c.play ?? 0, win: c.win ?? 0 }
       return table
+    })
+  }
+
+  /** Build recommandé (runes, sorts, items, compétences) en classée pour ce rôle. */
+  getBuild(champion: string, position: Position): Promise<ChampionBuild> {
+    return this.cache.wrap(`build:${opggChampionKey(champion)}:${position}`, 6 * HOUR, async () => {
+      const opt = '{ids[],ids_names[],play,win,pick_rate}'
+      const r = await this.call('lol_get_champion_analysis', {
+        champion: opggChampionKey(champion),
+        position,
+        game_mode: 'ranked',
+        desired_output_fields: [
+          'data.runes.{primary_page_id,primary_page_name,primary_rune_ids[],primary_rune_names[],secondary_page_id,secondary_page_name,secondary_rune_ids[],secondary_rune_names[],stat_mod_ids[],play,win}',
+          `data.summoner_spells.${opt}`,
+          `data.starter_items.${opt}`,
+          `data.core_items.${opt}`,
+          `data.boots.${opt}`,
+          `data.fourth_items[].${opt}`,
+          `data.fifth_items[].${opt}`,
+          `data.sixth_items[].${opt}`,
+          'data.skills.{order[]}',
+          'data.skill_masteries.{ids[]}'
+        ]
+      })
+      const d = r?.data ?? {}
+      const option = (o: any): BuildOption | null =>
+        o?.ids?.length
+          ? {
+              ids: o.ids,
+              names: (o.ids_names ?? []).map(String),
+              games: o.play ?? 0,
+              winRate: o.play ? (o.win ?? 0) / o.play : 0,
+              pickRate: o.pick_rate ?? 0
+            }
+          : null
+      const options = (list: any[] | undefined): BuildOption[] =>
+        (list ?? []).map(option).filter((o): o is BuildOption => !!o)
+      const ru = d.runes
+      return {
+        champion,
+        position,
+        runes: ru?.primary_page_id
+          ? {
+              primaryStyle: ru.primary_page_id,
+              primaryName: ru.primary_page_name ?? '',
+              subStyle: ru.secondary_page_id,
+              subName: ru.secondary_page_name ?? '',
+              perks: [...(ru.primary_rune_ids ?? []), ...(ru.secondary_rune_ids ?? [])],
+              perkNames: [...(ru.primary_rune_names ?? []), ...(ru.secondary_rune_names ?? [])].map(String),
+              shards: ru.stat_mod_ids ?? [],
+              games: ru.play ?? 0,
+              winRate: ru.play ? (ru.win ?? 0) / ru.play : 0
+            }
+          : null,
+        spells: option(d.summoner_spells),
+        starter: option(d.starter_items),
+        core: option(d.core_items),
+        boots: option(d.boots),
+        fourth: options(d.fourth_items),
+        fifth: options(d.fifth_items),
+        sixth: options(d.sixth_items),
+        skillOrder: (d.skills?.order ?? []).map(String),
+        skillPriority: (d.skill_masteries?.ids ?? []).map(String)
+      }
     })
   }
 

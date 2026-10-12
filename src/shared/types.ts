@@ -184,6 +184,8 @@ export interface Settings {
   useModel: boolean
   queueFilter: 'ranked' | 'all'
   candidatePool: 'owned' | 'played' | 'all'
+  /** Importe runes + sorts dans le client dès que le champion est locké. */
+  autoImport: boolean
 }
 
 export const DEFAULT_WEIGHTS: DraftWeights = {
@@ -200,7 +202,8 @@ export const DEFAULT_SETTINGS: Settings = {
   weights: DEFAULT_WEIGHTS,
   useModel: false,
   queueFilter: 'ranked',
-  candidatePool: 'played'
+  candidatePool: 'played',
+  autoImport: false
 }
 
 export interface StatsAggregate {
@@ -227,4 +230,46 @@ export interface SkillAxis {
   rawOverall: number
   rawRecent: number | null
   unit: string
+}
+
+// ---------- Build (runes, sorts, items, compétences) ----------
+
+export interface BuildOption {
+  ids: number[]
+  names: string[]
+  games: number
+  winRate: number
+  pickRate: number
+}
+
+export interface ChampionBuild {
+  champion: string
+  position: Position
+  runes: {
+    primaryStyle: number
+    primaryName: string
+    subStyle: number
+    subName: string
+    perks: number[] // 4 runes principales + 2 secondaires
+    perkNames: string[]
+    shards: number[] // 3 fragments de stats
+    games: number
+    winRate: number
+  } | null
+  spells: BuildOption | null
+  starter: BuildOption | null
+  core: BuildOption | null
+  boots: BuildOption | null
+  fourth: BuildOption[]
+  fifth: BuildOption[]
+  sixth: BuildOption[]
+  skillOrder: string[] // 15 premiers niveaux, ex. ["Q","W","E","Q",…]
+  skillPriority: string[] // ordre de montée, ex. ["Q","E","W"]
+}
+
+export interface ImportResult {
+  runes?: string
+  spells?: string
+  items?: string
+  errors: string[]
 }

@@ -27,6 +27,8 @@ const handlers: { [K in ApiMethod]: (...args: Parameters<Api[K]>) => ReturnType<
   suggest: (state) => service.suggest(state),
   getModel: () => service.getModel(),
   trainModel: () => service.trainModel((done, total) => win?.webContents.send('model:progress', { done, total })),
+  getBuild: (champion, position) => service.opgg.getBuild(champion, position),
+  importBuild: (champion, position, parts) => service.importBuild(champion, position, parts),
   launchRiotClient: async () => launchRiotClient(),
   signOut: async () => void service.setSettings({ manualAccount: null }),
   openExternal: async (url) => {
@@ -71,6 +73,15 @@ async function captureAllPages(w: BrowserWindow, dir: string): Promise<void> {
     await w.webContents.executeJavaScript(`document.querySelector('[data-nav="${page}"]')?.click()`)
     await wait(Number(process.env.OPGG_CAPTURE_DELAY ?? 8000))
     writeFileSync(join(dir, `${page}.png`), (await w.webContents.capturePage()).toPNG())
+  }
+  // OPGG_CAPTURE_CLICK="<texte d'un bouton>" : clique ce bouton sur la page Draft puis capture.
+  const clickLabel = process.env.OPGG_CAPTURE_CLICK
+  if (clickLabel) {
+    await w.webContents.executeJavaScript(
+      `document.querySelector('[data-nav="draft"]').click(); setTimeout(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === ${JSON.stringify(clickLabel)})?.click(), 800)`
+    )
+    await wait(6000)
+    writeFileSync(join(dir, 'draft-click.png'), (await w.webContents.capturePage()).toPNG())
   }
   // OPGG_CAPTURE_SIM="jungle|Ahri,Garen|Vi,Jinx,Darius" : simulation de draft (rôle|alliés|ennemis).
   const sim = process.env.OPGG_CAPTURE_SIM

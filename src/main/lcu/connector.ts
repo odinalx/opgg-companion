@@ -159,34 +159,53 @@ export class LcuConnector extends EventEmitter<LcuEvents> {
   }
 
   get(path: string): Promise<any> {
+    return this.request('GET', path)
+  }
+
+  /** Requête vers l'API locale du client. Les écritures ne partent que d'une action de l'utilisateur. */
+  request(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<any> {
     const creds = this.creds
     if (!creds) return Promise.reject(new Error('client LoL non connecté'))
+    const payload = body === undefined ? undefined : JSON.stringify(body)
     return new Promise((resolve, reject) => {
       const opts = {
         host: '127.0.0.1',
         port: creds.port,
         path,
-        method: 'GET',
-        headers: { Authorization: basicAuth(creds.password), Accept: 'application/json' },
+        method,
+        headers: {
+          Authorization: basicAuth(creds.password),
+          Accept: 'application/json',
+          ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {})
+        },
         timeout: 5000
       }
       const req =
         creds.protocol === 'https' ? request({ ...opts, agent: localAgent }) : httpRequest(opts)
       req.on('response', (res) => {
-        let body = ''
+        let text = ''
         res.setEncoding('utf8')
-        res.on('data', (c) => (body += c))
+        res.on('data', (c) => (text += c))
         res.on('end', () => {
-          if ((res.statusCode ?? 500) >= 400) return reject(new Error(`LCU ${res.statusCode} ${path}`))
+          if ((res.statusCode ?? 500) >= 400) {
+            let detail = ''
+            try {
+              detail = JSON.parse(text)?.message ?? ''
+            } catch {
+              /* corps non JSON */
+            }
+            return reject(new Error(`LCU ${res.statusCode} ${method} ${path}${detail ? ` : ${detail}` : ''}`))
+          }
           try {
-            resolve(body ? JSON.parse(body) : null)
+            resolve(text ? JSON.parse(text) : null)
           } catch {
-            resolve(body)
+            resolve(text)
           }
         })
       })
       req.on('timeout', () => req.destroy(new Error('LCU timeout')))
       req.on('error', reject)
+      if (payload) req.write(payload)
       req.end()
     })
   }

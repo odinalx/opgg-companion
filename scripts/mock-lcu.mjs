@@ -31,8 +31,18 @@ const steps = [
   (s) => (s.theirTeam[1].championId = idOf('Vi')),
   (s) => (s.myTeam[3].championPickIntent = idOf('Thresh')),
   (s) => (s.theirTeam[2].championId = idOf('Jinx')),
-  (s) => (s.theirTeam[3].championId = idOf('Darius'))
+  (s) => (s.theirTeam[3].championId = idOf('Darius')),
+  // Le joueur local verrouille son champion (MOCK_PICK, Nasus par défaut).
+  (s) => {
+    const me = s.myTeam.find((p) => p.cellId === s.localPlayerCellId)
+    me.championId = idOf(process.env.MOCK_PICK ?? 'Nasus')
+    s.actions = [[{ id: 1, actorCellId: s.localPlayerCellId, championId: me.championId, type: 'pick', completed: true }]]
+  }
 ]
+
+// État modifiable par l'app (imports de build) : visible dans la console du mock.
+let perkPages = [{ id: 1, name: 'Page de base', isDeletable: false, current: false }]
+let itemSets = { accountId: 1, itemSets: [], timestamp: 0 }
 
 // Le joueur local (cellule 2) prend le rôle MOCK_ROLE ; l'allié qui l'avait récupère le milieu.
 const ROLES = ['jungle', 'top', 'middle', 'utility', 'bottom']
@@ -58,11 +68,15 @@ const routes = {
     gameName: ACCOUNT.gameName,
     tagLine: ACCOUNT.tagLine,
     puuid: 'mock-puuid',
+    summonerId: 42,
     summonerLevel: 512,
     profileIconId: 6
   }),
   '/riotclient/region-locale': () => ({ region: ACCOUNT.region, locale: 'fr_FR' }),
   '/lol-champ-select/v1/session': () => session,
+  '/lol-perks/v1/pages': () => perkPages,
+  '/lol-perks/v1/currentpage': () => perkPages.find((p) => p.current) ?? perkPages[0],
+  '/lol-item-sets/v1/item-sets/42/sets': () => itemSets,
   '/lol-gameflow/v1/session': () => ({ gameData: { queue: { id: Number(process.env.MOCK_QUEUE ?? 420) } } }),
   '/lol-champion-mastery/v1/local-player/champion-mastery': () => [
     { championId: idOf('Ahri'), championLevel: 12, championPoints: 182000 },
@@ -75,11 +89,49 @@ const routes = {
   '/lol-match-history/v1/products/lol/current-summoner/matches': () => ({ games: { games: [] } })
 }
 
+const readBody = (req) =>
+  new Promise((resolve) => {
+    let b = ''
+    req.on('data', (c) => (b += c))
+    req.on('end', () => resolve(b ? JSON.parse(b) : null))
+  })
+
+// Écritures acceptées par le faux client (même chemins que le vrai).
+async function write(req, res) {
+  const url = req.url.split('?')[0]
+  const body = await readBody(req)
+  const ok = (data = null) => res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(data))
+  if (req.method === 'POST' && url === '/lol-perks/v1/pages') {
+    if (perkPages.length >= 3) return res.writeHead(400).end(JSON.stringify({ message: 'Max pages reached' }))
+    const page = { ...body, id: Date.now(), isDeletable: true }
+    perkPages = [...perkPages.map((p) => ({ ...p, current: false })), page]
+    console.log('[import] page de runes :', body.name, body.selectedPerkIds.join(','))
+    return ok(page)
+  }
+  if (req.method === 'DELETE' && url.startsWith('/lol-perks/v1/pages/')) {
+    perkPages = perkPages.filter((p) => String(p.id) !== url.split('/').pop())
+    return ok()
+  }
+  if (req.method === 'PATCH' && url === '/lol-champ-select/v1/session/my-selection') {
+    const me = session.myTeam.find((p) => p.cellId === session.localPlayerCellId)
+    Object.assign(me, body)
+    console.log('[import] sorts :', body)
+    return ok()
+  }
+  if (req.method === 'PUT' && url.startsWith('/lol-item-sets/v1/item-sets/')) {
+    itemSets = body
+    console.log('[import] sets d\'items :', body.itemSets.map((s) => `${s.title} (${s.blocks.length} blocs)`).join(', '))
+    return ok()
+  }
+  res.writeHead(404).end(JSON.stringify({ message: 'not found' }))
+}
+
 const server = createServer((req, res) => {
   if (req.headers.authorization !== 'Basic ' + Buffer.from(`riot:${PASSWORD}`).toString('base64')) {
     res.writeHead(401).end()
     return
   }
+  if (req.method !== 'GET') return void write(req, res)
   const route = routes[req.url.split('?')[0]]
   if (!route) {
     res.writeHead(404).end(JSON.stringify({ message: 'not found' }))

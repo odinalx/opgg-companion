@@ -98,13 +98,30 @@ export function SettingsPage() {
           </div>
         </section>
 
+        <section>
+          <h2 className="font-display text-2xl font-bold">Import du build</h2>
+          <p className="mt-1 text-sm text-soft">
+            Quand tu verrouilles ton champion, l'app peut créer la page de runes OP.GG et choisir les sorts recommandés dans
+            le client. Flash reste sur ta touche habituelle.
+          </p>
+          <label className="mt-3 flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={s.autoImport}
+              onChange={(e) => void updateSettings({ autoImport: e.target.checked })}
+              className="h-4 w-4 accent-[var(--color-accent)]"
+            />
+            Importer automatiquement runes et sorts au verrouillage du champion
+          </label>
+        </section>
+
         <ModelSection useModel={s.useModel} onToggle={(v) => void updateSettings({ useModel: v })} />
 
         <section className="text-sm text-mute">
           <h2 className="font-display text-2xl font-bold text-ink">Sources</h2>
           <p className="mt-1">
             Statistiques et historiques : OP.GG MCP. Compte, mastery et sélection en direct : client League of Legends local
-            (lecture seule, aucune action automatique). Icônes : Riot Data Dragon.
+            (lecture ; seuls les imports de runes, sorts et sets d'items que tu demandes y écrivent). Icônes : Riot Data Dragon.
           </p>
         </section>
       </div>

@@ -16,6 +16,8 @@ const methods: ApiMethod[] = [
   'getModel',
   'trainModel',
   'openExternal',
+  'getBuild',
+  'importBuild',
   'launchRiotClient',
   'signOut'
 ]
@@ -35,5 +37,6 @@ contextBridge.exposeInMainWorld('api', {
   ...api,
   onClientStatus: (cb) => subscribe('client:status', cb),
   onLiveDraft: (cb) => subscribe('draft:live', cb),
-  onTrainProgress: (cb) => subscribe('model:progress', cb)
+  onTrainProgress: (cb) => subscribe('model:progress', cb),
+  onAutoImport: (cb) => subscribe('build:auto-imported', cb)
 } satisfies Api)

@@ -4,6 +4,7 @@ import type { CriterionKey, DraftQueue, DraftSlot, DraftState, DraftWeights, Pos
 import { CRITERIA, POSITIONS } from '@shared/types'
 import { useApp } from '../store'
 import { ChampIcon, Splash } from '../components/Icons'
+import { BuildPanel } from '../components/BuildPanel'
 import { Button, Empty, Notice, PageHeader, Spinner } from '../components/ui'
 import { positionLabel } from '../lib/format'
 
@@ -49,6 +50,7 @@ export function DraftPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const requestId = useRef(0)
+  const [viewBuild, setViewBuild] = useState<string | null>(null)
 
   useEffect(() => {
     void window.api.getLiveDraft().then(setLive)
@@ -81,6 +83,12 @@ export function DraftPage() {
 
   const isLive = useLive && !!live
   const [top, ...rest] = result?.suggestions ?? []
+  // En direct, le champion sélectionné par le joueur ouvre son build ; sinon, celui demandé.
+  const buildChampion = (isLive && state.pickedByMe) || viewBuild
+  const showBuild = (c: string): void => {
+    setViewBuild(c)
+    document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   return (
     <>
@@ -132,6 +140,16 @@ export function DraftPage() {
 
         <section aria-live="polite" className="min-w-0">
           {error && <Notice tone="error">{error}</Notice>}
+          {buildChampion && state.myPosition && (
+            <div className="mb-4">
+              <BuildPanel
+                champion={buildChampion}
+                position={state.myPosition}
+                locked={isLive && state.pickedByMe === buildChampion}
+                onClose={isLive && state.pickedByMe ? undefined : () => setViewBuild(null)}
+              />
+            </div>
+          )}
           {!state.myPosition ? (
             <Empty title="Choisis ton rôle">Les suggestions dépendent de la lane que tu joues.</Empty>
           ) : !result && loading ? (
@@ -142,8 +160,14 @@ export function DraftPage() {
             </Empty>
           ) : result && top ? (
             <div className={`flex flex-col gap-3 transition-opacity ${loading ? 'opacity-60' : ''}`}>
-              <TopPick s={top} weights={result.weightsUsed} enemyLaner={result.enemyLaner} usedModel={result.usedModel} />
-              <SuggestionList suggestions={rest} weights={result.weightsUsed} />
+              <TopPick
+                s={top}
+                weights={result.weightsUsed}
+                enemyLaner={result.enemyLaner}
+                usedModel={result.usedModel}
+                onBuild={() => showBuild(top.champion)}
+              />
+              <SuggestionList suggestions={rest} weights={result.weightsUsed} onBuild={showBuild} />
               {result.warnings.map((w) => (
                 <p key={w} className="text-sm text-mute">
                   {w}
@@ -371,12 +395,14 @@ function TopPick({
   s,
   weights,
   enemyLaner,
-  usedModel
+  usedModel,
+  onBuild
 }: {
   s: Suggestion
   weights: DraftWeights
   enemyLaner: string | null
   usedModel: boolean
+  onBuild: () => void
 }) {
   return (
     <article className="hero">
@@ -390,6 +416,9 @@ function TopPick({
             </p>
             <h2 className="font-display text-7xl leading-[0.9] font-bold tracking-tight">{s.champion}</h2>
             <p className="mt-3 max-w-xl text-soft">{s.summary}</p>
+            <div className="mt-4">
+              <Button onClick={onBuild}>Voir le build</Button>
+            </div>
           </div>
           <div className="shrink-0 text-right">
             <p className="num text-8xl leading-[0.8] font-bold text-accent">{Math.round(s.score)}</p>
@@ -413,7 +442,15 @@ function TopPick({
   )
 }
 
-function SuggestionList({ suggestions, weights }: { suggestions: Suggestion[]; weights: DraftWeights }) {
+function SuggestionList({
+  suggestions,
+  weights,
+  onBuild
+}: {
+  suggestions: Suggestion[]
+  weights: DraftWeights
+  onBuild: (champion: string) => void
+}) {
   const [open, setOpen] = useState<string | null>(null)
   if (!suggestions.length) return null
   return (
@@ -426,6 +463,7 @@ function SuggestionList({ suggestions, weights }: { suggestions: Suggestion[]; w
           weights={weights}
           open={open === s.champion}
           onToggle={() => setOpen(open === s.champion ? null : s.champion)}
+          onBuild={() => onBuild(s.champion)}
         />
       ))}
     </ol>
@@ -437,13 +475,15 @@ function SuggestionRow({
   rank,
   weights,
   open,
-  onToggle
+  onToggle,
+  onBuild
 }: {
   s: Suggestion
   rank: number
   weights: DraftWeights
   open: boolean
   onToggle: () => void
+  onBuild: () => void
 }) {
   return (
     <li>
@@ -462,7 +502,8 @@ function SuggestionRow({
         <p className="num w-14 text-right text-4xl leading-none font-bold">{Math.round(s.score)}</p>
       </button>
       {open && (
-        <table className="mb-3 ml-[4.75rem] w-[calc(100%-6rem)] text-sm">
+        <div className="mb-3 ml-[4.75rem] w-[calc(100%-6rem)]">
+        <table className="w-full text-sm">
           <caption className="sr-only">Détail du score de {s.champion}</caption>
           <tbody>
             {CRITERIA.map((k) => {
@@ -484,6 +525,12 @@ function SuggestionRow({
             })}
           </tbody>
         </table>
+        <div className="mt-2">
+          <Button variant="ghost" onClick={onBuild}>
+            Voir le build de {s.champion}
+          </Button>
+        </div>
+        </div>
       )}
     </li>
   )

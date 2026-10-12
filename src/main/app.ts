@@ -2,6 +2,7 @@
 // Toutes les méthodes publiques sont exposées au renderer via IPC (voir index.ts).
 
 import type {
+  ImportResult,
   ClientStatus,
   DraftQueue,
   DraftState,
@@ -21,6 +22,7 @@ import { featureVector } from './draft/score'
 import { MIN_SAMPLES, type Sample, trainModel } from './draft/train'
 import { sessionToDraft, lcuPosition } from './lcu/champSelect'
 import { LcuConnector } from './lcu/connector'
+import { importBuild } from './lcu/importer'
 import { OpggClient } from './opgg/client'
 import { aggregate, filterMatches, matchesForDraft, mergeMatches } from './stats'
 import { DiskCache, JsonFile, dataPath } from './store'
@@ -58,9 +60,10 @@ export class AppService {
       this.emit('client:status', s)
       if (s.account) this.settings.update((cur) => ({ ...cur, region: s.account!.region }))
     })
-    this.lcu.on('champSelect', (session) =>
+    this.lcu.on('champSelect', (session) => {
       this.emit('draft:live', session ? sessionToDraft(session, this.lcu.getQueueId()) : null)
-    )
+      void this.autoImportOnLock(session)
+    })
   }
 
   start(): void {
@@ -243,6 +246,42 @@ export class AppService {
     const model = acc ? this.models.get()[accKey(acc)] : undefined
     const modelWeights = settings.useModel && model && model.samples >= MIN_SAMPLES ? model.weights : null
     return this.engine.suggest(state, player, settings, modelWeights)
+  }
+
+  // ---------- Build ----------
+
+  async importBuild(
+    champion: string,
+    position: Position,
+    parts: { runes?: boolean; spells?: boolean; items?: boolean }
+  ): Promise<ImportResult> {
+    if (!this.lcu.getStatus().connected) throw new Error("Lance le client LoL pour importer le build.")
+    return importBuild(this.lcu, await this.opgg.getBuild(champion, position), parts)
+  }
+
+  private autoImported: string | null = null
+
+  /** Option « importer au lock » : runes + sorts dès que le pick du joueur est validé. */
+  private async autoImportOnLock(session: any | null): Promise<void> {
+    if (!session) {
+      this.autoImported = null
+      return
+    }
+    if (!this.settings.get().autoImport) return
+    await loadStaticData() // les noms de champions sont nécessaires pour lire la session
+    const me = session.localPlayerCellId
+    const lock = (session.actions ?? []).flat().find((a: any) => a.type === 'pick' && a.actorCellId === me && a.completed)
+    const draft = sessionToDraft(session)
+    if (!lock || !draft.pickedByMe || !draft.myPosition) return
+    const key = `${session.gameId ?? ''}:${draft.pickedByMe}`
+    if (this.autoImported === key) return
+    this.autoImported = key
+    try {
+      const result = await this.importBuild(draft.pickedByMe, draft.myPosition, { runes: true, spells: true })
+      this.emit('build:auto-imported', { champion: draft.pickedByMe, ...result })
+    } catch (e) {
+      this.emit('build:auto-imported', { champion: draft.pickedByMe, errors: [(e as Error).message] })
+    }
   }
 
   // ---------- Modèle ML ----------

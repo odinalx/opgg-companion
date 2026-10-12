@@ -12,7 +12,10 @@ import type {
   Settings,
   StatsAggregate,
   Suggestion,
-  ChampionInfo
+  ChampionInfo,
+  ChampionBuild,
+  ImportResult,
+  Position
 } from './types'
 
 export interface StaticDataDto {
@@ -45,11 +48,14 @@ export interface Api {
   getModel(): Promise<ModelInfo | null>
   trainModel(): Promise<ModelInfo>
   openExternal(url: string): Promise<void>
+  getBuild(champion: string, position: Position): Promise<ChampionBuild>
+  importBuild(champion: string, position: Position, parts: { runes?: boolean; spells?: boolean; items?: boolean }): Promise<ImportResult>
   launchRiotClient(): Promise<void>
   signOut(): Promise<void>
   onClientStatus(cb: (s: ClientStatus) => void): () => void
   onLiveDraft(cb: (d: DraftState | null) => void): () => void
   onTrainProgress(cb: (p: { done: number; total: number }) => void): () => void
+  onAutoImport(cb: (r: ImportResult & { champion: string }) => void): () => void
 }
 
-export type ApiMethod = Exclude<keyof Api, 'onClientStatus' | 'onLiveDraft' | 'onTrainProgress'>
+export type ApiMethod = Exclude<keyof Api, 'onClientStatus' | 'onLiveDraft' | 'onTrainProgress' | 'onAutoImport'>
